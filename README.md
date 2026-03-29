@@ -1,76 +1,56 @@
 # StealthNFT
 
-**StealthNFT** is a confidential NFT marketplace demo on **Ethereum Sepolia** using **Fhenix CoFHE**: listing prices and buyer offers are encrypted on-chain (`euint64`), and the marketplace contract compares them with **`FHE.gte`** without revealing plaintext amounts. Settlement uses the standard **decrypt-with-proof** flow (threshold decrypt off-chain, then `finalizeSale` on-chain).
+**StealthNFT** is a confidential NFT marketplace demo on **Ethereum Sepolia** using **Fhenix CoFHE**. Listing prices and buyer offers are encrypted on-chain (`euint64` handles); the marketplace contract compares them with **`FHE.gte`** without revealing plaintext amounts. Settlement uses **decrypt-with-proof** (threshold decrypt off-chain, then `finalizeSale` on-chain).
 
-This repository is structured for production-style deployment:
+## Product
 
-- **`web/`** — Next.js 15 app (App Router): black & white UI, **Clerk** (sign-in), **RainbowKit + wagmi** (wallet), **@cofhe/sdk** (encrypt / decrypt).
-- **`contracts/`** — Hardhat + `@fhenixprotocol/cofhe-contracts`: **StealthNFT** (ERC-721) and **StealthMarketplace** (FHE listing + escrow + settlement).
+Public marketplaces expose **bids and asks**, which enables **front-running**, **whale tracking**, and **strategy copying**. StealthNFT keeps **NFT metadata and ownership** visible while **price and offer amounts** stay as **ciphertext handles** until the protocol allows decryption for settlement.
 
-demo- 
+| Visible on-chain | Hidden / encrypted |
+|------------------|-------------------|
+| Token URI, ownership transfers, that a listing exists | Plaintext listing price and offer |
+| Marketplace events (list, attempt, sale) without amounts | Comparison via FHE on ciphertexts |
 
-## What problem does this solve?
+## Stack
 
-Public NFT marketplaces expose **listing and bid prices**, which enables **price manipulation**, **whale tracking**, and **strategy copying**. StealthNFT keeps **NFT metadata and ownership visible** while treating **price and offer amounts as encrypted handles**, and only the **FHE program** evaluates whether an offer clears the ask—using homomorphic comparison, not a public `require(price <= offer)` on plaintext.
-
-## Architecture (high level)
-
-| Layer | Role |
+| Piece | Role |
 |--------|------|
-| **Ethereum Sepolia** | Hosts ERC-721 + marketplace contracts; CoFHE coprocessor integrates with this chain per Fhenix docs. |
-| **CoFHE** | Client encrypts inputs with ZK proofs; chain stores ciphertext handles; threshold network decrypts when allowed (e.g. after `allowPublicBuyer`). |
-| **Next.js** | UI, Clerk sessions, wallet connection, CoFHE client lifecycle (browser-only). |
-| **Clerk** | User accounts for gated routes (e.g. **My listings**). |
+| **Next.js 15** (App Router) | UI, metadata, `/sign-in` & `/sign-up` hosted Clerk pages, drawer shell |
+| **Clerk** | Auth; **My listings** (`/listings`) protected by middleware |
+| **RainbowKit + wagmi + viem** | Wallet, Sepolia, contract calls |
+| **@cofhe/sdk** | Encrypt inputs, decrypt for txs with proofs |
+| **Solidity** (`contracts/`) | `StealthNFT` ERC-721 + `StealthMarketplace` FHE listing / escrow |
 
-> **Note:** You asked for “login using flro” in the brief — this project uses **Clerk** for app login. If you meant a different provider, swap the Clerk pieces for your stack.
+## Repository layout
 
-## Core flows
+- **`web/`** — Next.js app: `AppShell` (top bar + drawer), `SiteFooter`, Sonner toasts, Sepolia network banner, CoFHE provider.
+- **`contracts/`** — Hardhat + `@fhenixprotocol/cofhe-contracts`: deploy to Sepolia, paste addresses into `web/.env.local`.
 
-### Seller
+## Environment variables (`web/`)
 
-1. Connect wallet on **Sepolia** (RainbowKit).
-2. **Mint** a demo NFT (`/mint`) with a picsum image seed.
-3. Open the token page (`/nft/[id]`), enter an **ask** in ETH, **Approve & list**. The UI encrypts the wei amount (fits `uint64`) and calls `listNFT(tokenId, InEuint64)`.
-4. Optionally **cancel** if no bids yet.
+Copy `web/.env.example` to `web/.env.local` and fill values.
 
-### Buyer
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes (for auth UI) | Clerk publishable key |
+| `CLERK_SECRET_KEY` | Yes (server / middleware) | Clerk secret — **never commit** |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Optional | Defaults to `/sign-in`; set full Vercel URL in production if needed |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Optional | Defaults to `/sign-up` |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Yes | [WalletConnect Cloud](https://cloud.walletconnect.com) project id |
+| `NEXT_PUBLIC_NFT_ADDRESS` | After deploy | StealthNFT proxy address on Sepolia |
+| `NEXT_PUBLIC_MARKETPLACE_ADDRESS` | After deploy | StealthMarketplace proxy address on Sepolia |
+| `NEXT_PUBLIC_LOGS_FROM_BLOCK` | Optional | Deployment block; speeds up **Activity** event queries |
 
-1. Browse **Marketplace** — sees art and token id, **not** the listing price.
-2. On the token page, submit an **encrypted offer** (`buyNFT`).
-3. Seller calls **`allowPublicBuyer`** so the encrypted winner can be decrypted off-chain.
-4. Buyer runs **decrypt** (`decryptForTx` via CoFHE SDK) and calls **`finalizeSale`** with the proof + **ETH** to the seller (settlement value is visible in that transaction—typical for ETH transfer demos).
+**Clerk dashboard:** under **Paths** and **Allowed redirect URLs**, include `https://<your-domain>/sign-in`, `https://<your-domain>/sign-up`, and preview URLs if you use Vercel previews.
 
-### Optional: reveal listing price
+Contracts deploy (reference): set `SEPOLIA_RPC_URL` and `DEPLOYER_PRIVATE_KEY` in `contracts/.env` (see `contracts/.env.example` if present).
 
-Seller can call **`allowPublicPrice`** on-chain (see contract) for selective disclosure after the fact.
-
-## Smart contracts
-
-- **`StealthNFT`**: `mint(to, uri)`, `totalSupply`, ERC-721 URI storage.
-- **`StealthMarketplace`**: holds NFT in escrow while listed; `listNFT`, `buyNFT` (FHE.gte + `FHE.select` on `eaddress` pending buyer), `allowPublicBuyer`, `finalizeSale`, `cancelListing`.
-
-**Price type:** `euint64` in **wei** (demo cap ~18.4 ETH per `uint64` max).
-
-## Deploy contracts (Sepolia)
-
-```bash
-cd contracts
-cp .env.example .env
-# Edit .env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY
-
-npm install
-npx hardhat compile
-npx hardhat run scripts/deploy.ts --network sepolia
-```
-
-Copy the printed `NEXT_PUBLIC_*` addresses into `web/.env.local`.
-
-## Run the web app
+## Local development
 
 ```bash
 cd web
 cp .env.example .env.local
-# Fill Clerk keys, WalletConnect project id, contract addresses
+# Add Clerk, WalletConnect, and (after deploy) contract addresses
 
 npm install
 npm run dev
@@ -78,17 +58,53 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Production checklist
+## Deploy contracts (Sepolia)
 
-- [ ] Use a real IPFS or HTTP gateway for `tokenURI` (not only picsum).
-- [ ] Set `NEXT_PUBLIC_LOGS_FROM_BLOCK` to your deployment block to speed up logs.
-- [ ] Rotate keys; never commit `.env` or `.env.local`.
-- [ ] Deploy `web` to Vercel (or similar) with env vars; use a stable Sepolia RPC.
+```bash
+cd contracts
+# Configure .env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY
 
-## Fhenix documentation
+npm install
+npx hardhat compile
+npx hardhat run scripts/deploy.ts --network sepolia
+```
 
-Use the official CoFHE docs for encryption, ACL, and decrypt patterns: [Fhenix CoFHE documentation](https://cofhe-docs.fhenix.zone).
+Copy printed addresses into `web/.env.local` as `NEXT_PUBLIC_NFT_ADDRESS` and `NEXT_PUBLIC_MARKETPLACE_ADDRESS`.
+
+## Deploy frontend (Vercel)
+
+- Set **Root Directory** to `web/` (or monorepo equivalent).
+- Add the same env vars as in the table above in the Vercel project settings.
+- Redeploy after changing Clerk or contract addresses.
+
+## User flows
+
+1. **Connect** wallet on **Sepolia**; optional **Sign in** with Clerk for `/listings`.
+2. **Mint** (`/mint`) a demo NFT (picsum image by seed).
+3. **List** from `/nft/[id]`: approve marketplace, **encrypt** ask, `listNFT`.
+4. **Buy**: open listing, submit **encrypted offer** (`buyNFT`).
+5. **Settle**: seller **`allowPublicBuyer`** → buyer **decrypts** off-chain → **`finalizeSale`** with proof + settlement ETH.
+
+## Security
+
+- **Never commit** `.env`, `.env.local`, or private keys. Rotate keys if exposed.
+- Treat this repo as a **testnet demo**; audit contracts before mainnet.
+- Keep **Next.js** and dependencies updated; review security advisories for your stack.
+
+## Troubleshooting
+
+| Issue | What to check |
+|--------|----------------|
+| Middleware **500** / Clerk errors | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` set on Vercel; middleware skips Clerk when keys missing (dev fallback). |
+| **Wrong network** | Connect wallet to **Sepolia** (chain id `11155111`); app shows a banner when connected on another chain. |
+| **Empty marketplace** | Deploy contracts, set env addresses, mint + list from token page. |
+| **Activity slow / timeout** | Set `NEXT_PUBLIC_LOGS_FROM_BLOCK` to your deployment block. |
+| **CoFHE / IndexedDB** in build logs | SDK may log during static generation; build can still succeed. |
+
+## Documentation
+
+- **Fhenix CoFHE:** [cofhe-docs.fhenix.zone](https://cofhe-docs.fhenix.zone)
 
 ## License
 
-MIT (see individual contract SPDX headers).
+MIT (see SPDX headers in contract files).
