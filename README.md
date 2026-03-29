@@ -7,6 +7,8 @@ This repository is structured for production-style deployment:
 - **`web/`** — Next.js 15 app (App Router): black & white UI, **Clerk** (sign-in), **RainbowKit + wagmi** (wallet), **@cofhe/sdk** (encrypt / decrypt).
 - **`contracts/`** — Hardhat + `@fhenixprotocol/cofhe-contracts`: **StealthNFT** (ERC-721) and **StealthMarketplace** (FHE listing + escrow + settlement).
 
+demo- 
+
 ## What problem does this solve?
 
 Public NFT marketplaces expose **listing and bid prices**, which enables **price manipulation**, **whale tracking**, and **strategy copying**. StealthNFT keeps **NFT metadata and ownership visible** while treating **price and offer amounts as encrypted handles**, and only the **FHE program** evaluates whether an offer clears the ask—using homomorphic comparison, not a public `require(price <= offer)` on plaintext.

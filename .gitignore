@@ -16,3 +16,4 @@ web/utils
 web/components
 web/hooks
 web/lib
+.vercel
