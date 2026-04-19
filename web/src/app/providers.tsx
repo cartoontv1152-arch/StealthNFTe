@@ -45,6 +45,10 @@ customTheme.colors.modalBackground = "#12121a";
 customTheme.colors.profileForeground = "#1a1a25";
 customTheme.colors.connectButtonBackground = "#a855f7";
 customTheme.colors.connectButtonInnerBackground = "#7c3aed";
+customTheme.colors.modalBorder = "#1e1e2e";
+customTheme.colors.modalText = "#ffffff";
+customTheme.colors.modalTextSecondary = "#94a3b8";
+customTheme.colors.modalTextTertiary = "#64748b";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());

@@ -26,6 +26,30 @@ export function ParticleField() {
     const colors = ["#a855f7", "#06b6d4", "#ec4899", "#8b5cf6", "#14b8a6"];
     const particles: Particle[] = [];
     let animationId: number;
+    let running = true;
+    let reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      reducedMotion = e.matches;
+      if (reducedMotion) {
+        particles.length = 0;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", handleMotionChange);
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        running = false;
+        cancelAnimationFrame(animationId);
+      } else if (!reducedMotion) {
+        running = true;
+        animate();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -44,6 +68,8 @@ export function ParticleField() {
     });
 
     const animate = () => {
+      if (!running || reducedMotion) return;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (Math.random() < 0.05 && particles.length < 80) {
@@ -98,11 +124,16 @@ export function ParticleField() {
 
     resize();
     window.addEventListener("resize", resize);
-    animate();
+
+    if (!reducedMotion) {
+      animate();
+    }
 
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.matchMedia("(prefers-reduced-motion: reduce)").removeEventListener("change", handleMotionChange);
     };
   }, []);
 
@@ -111,6 +142,7 @@ export function ParticleField() {
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none z-[1]"
       style={{ opacity: 0.6 }}
+      aria-hidden="true"
     />
   );
 }
