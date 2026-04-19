@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useCofheEncrypt, useCofheContext } from "@cofhe/react";
-import type { EncryptedItemInput } from "@cofhe/sdk";
+import { createCofheClient, createCofheConfig, FheTypes, EncryptedItemInput } from "@cofhe/sdk";
+import type { PublicClient, WalletClient } from "viem";
 
 export interface EncryptedValue {
   ciphertext: string;
   signature: string;
   random: string;
   handle: bigint;
+  inputType: string;
 }
 
 export interface EncryptedMetadata {
@@ -22,29 +23,42 @@ export interface EncryptedMetadata {
   };
 }
 
+let cofheClient: ReturnType<typeof createCofheClient> | null = null;
+
 export function useCoFHE() {
   const [encrypting, setEncrypting] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
-  const cofhe = useCofheContext();
 
-  const { mutateAsync: encryptMutation } = useCofheEncrypt();
+  const getClient = useCallback(() => {
+    if (!cofheClient) {
+      const cofheConfig = createCofheConfig({
+        fheKeyStorage: "in-memory",
+        publicClient: null as unknown as PublicClient,
+        walletClient: null as unknown as WalletClient,
+      });
+      cofheClient = createCofheClient(cofheConfig);
+    }
+    return cofheClient;
+  }, []);
 
   const encryptValue = useCallback(async (value: bigint | number): Promise<EncryptedValue | null> => {
     setEncrypting(true);
     try {
+      const client = getClient();
       const input = BigInt(value);
 
-      const encrypted = await encryptMutation({
+      const encrypted = await client.encrypt({
         euint64: input,
       });
 
       if (encrypted && encrypted.length > 0) {
-        const result = encrypted[0] as EncryptedItemInput & { handle: bigint };
+        const result = encrypted[0];
         return {
           ciphertext: result.ciphertext || "",
           signature: result.signature || "",
-          random: (result.random as string) || "",
+          random: String(result.random || ""),
           handle: result.handle || BigInt(0),
+          inputType: "euint64",
         };
       }
       return null;
@@ -54,7 +68,7 @@ export function useCoFHE() {
     } finally {
       setEncrypting(false);
     }
-  }, [encryptMutation]);
+  }, [getClient]);
 
   const encryptMetadata = useCallback(async (metadata: {
     name: string;
@@ -68,19 +82,11 @@ export function useCoFHE() {
       const combinedValue = `${metadata.name}|${metadata.description}|${metadata.price}|${JSON.stringify(metadata.attributes || {})}`;
       const hash = hashString(combinedValue);
 
-      const encrypted = await encryptMutation({
-        euint64: hash,
-      });
+      const encrypted = await encryptValue(hash);
 
-      if (encrypted && encrypted.length > 0) {
-        const result = encrypted[0] as EncryptedItemInput & { handle: bigint };
+      if (encrypted) {
         return {
-          encrypted: {
-            ciphertext: result.ciphertext || "",
-            signature: result.signature || "",
-            random: (result.random as string) || "",
-            handle: result.handle || BigInt(0),
-          },
+          encrypted,
           original: metadata,
         };
       }
@@ -91,7 +97,7 @@ export function useCoFHE() {
     } finally {
       setEncrypting(false);
     }
-  }, [encryptMutation]);
+  }, [encryptValue]);
 
   return {
     encryptValue,

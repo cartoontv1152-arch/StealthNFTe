@@ -11,7 +11,6 @@
   "dependencies": {
     "@clerk/nextjs": "^7.0.7",
     "@cofhe/abi": "^0.4.0",
-    "@cofhe/react": "^0.4.0",
     "@cofhe/sdk": "^0.4.0",
     "@mui/icons-material": "^9.0.0",
     "@rainbow-me/rainbowkit": "^2.1.7",
