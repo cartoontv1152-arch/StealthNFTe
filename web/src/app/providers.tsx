@@ -5,36 +5,33 @@ import { WagmiProvider } from "wagmi";
 import { getDefaultConfig, darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { useState } from "react";
-import type { Config as ChainConfig } from "viem";
-
-const chains: ChainConfig[] = [
-  {
-    id: 11155111,
-    name: "Sepolia",
-    network: "sepolia",
-    nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
-    rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/"] } },
-  },
-  {
-    id: 421614,
-    name: "Arbitrum Sepolia",
-    network: "arbitrum-sepolia",
-    nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
-    rpcUrls: { default: { http: ["https://sepolia-rollup.arbitrum.io/rpc"] } },
-  },
-  {
-    id: 84532,
-    name: "Base Sepolia",
-    network: "base-sepolia",
-    nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
-    rpcUrls: { default: { http: ["https://sepolia.base.org"] } },
-  },
-];
 
 const config = getDefaultConfig({
   appName: "StealthNFT",
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo",
-  chains,
+  chains: [
+    {
+      id: 11155111,
+      name: "Sepolia",
+      network: "sepolia",
+      nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
+      rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/"] } },
+    },
+    {
+      id: 421614,
+      name: "Arbitrum Sepolia",
+      network: "arbitrum-sepolia",
+      nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
+      rpcUrls: { default: { http: ["https://sepolia-rollup.arbitrum.io/rpc"] } },
+    },
+    {
+      id: 84532,
+      name: "Base Sepolia",
+      network: "base-sepolia",
+      nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" },
+      rpcUrls: { default: { http: ["https://sepolia.base.org"] } },
+    },
+  ],
 });
 
 const customTheme = darkTheme({

@@ -1,22 +1,16 @@
 "use client";
 
-import { useAccount } from "wagmi";
-import { useContractWrite } from "wagmi";
-import { NFT_ABI } from "@/lib/contracts";
+import { useWriteContract, useAccount } from "wagmi";
 
 const NFT_ADDRESS = process.env.NEXT_PUBLIC_NFT_ADDRESS as `0x${string}`;
 
 export function useNFT() {
   const { address } = useAccount();
 
-  const mint = useContractWrite({
-    address: NFT_ADDRESS,
-    abi: NFT_ABI,
-    functionName: "mint",
-  });
+  const { write: mintWrite } = useWriteContract();
 
   return {
-    mint,
+    mint: { write: mintWrite },
     address,
     NFT_ADDRESS,
   };

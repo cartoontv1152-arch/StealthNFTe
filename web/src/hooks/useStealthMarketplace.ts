@@ -1,6 +1,6 @@
 "use client";
 
-import { useContractRead, useContractWrite, useAccount } from "wagmi";
+import { useContractRead, useWriteContract, useAccount } from "wagmi";
 import { MARKETPLACE_ABI, NFT_ABI } from "@/lib/contracts";
 
 const MARKETPLACE_ADDRESS = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS as `0x${string}`;
@@ -30,52 +30,23 @@ export function useStealthMarketplace() {
     args: [BigInt(1)],
   });
 
-  const listNFT = useContractWrite({
-    address: MARKETPLACE_ADDRESS,
-    abi: MARKETPLACE_ABI,
-    functionName: "listNFT",
-  });
-
-  const buyNFT = useContractWrite({
-    address: MARKETPLACE_ADDRESS,
-    abi: MARKETPLACE_ABI,
-    functionName: "buyNFT",
-  });
-
-  const allowPublicBuyer = useContractWrite({
-    address: MARKETPLACE_ADDRESS,
-    abi: MARKETPLACE_ABI,
-    functionName: "allowPublicBuyer",
-  });
-
-  const allowPublicPrice = useContractWrite({
-    address: MARKETPLACE_ADDRESS,
-    abi: MARKETPLACE_ABI,
-    functionName: "allowPublicPrice",
-  });
-
-  const finalizeSale = useContractWrite({
-    address: MARKETPLACE_ADDRESS,
-    abi: MARKETPLACE_ABI,
-    functionName: "finalizeSale",
-  });
-
-  const cancelListing = useContractWrite({
-    address: MARKETPLACE_ADDRESS,
-    abi: MARKETPLACE_ABI,
-    functionName: "cancelListing",
-  });
+  const { write: listNFTWrite } = useWriteContract();
+  const { write: buyNFTWrite } = useWriteContract();
+  const { write: allowPublicBuyerWrite } = useWriteContract();
+  const { write: allowPublicPriceWrite } = useWriteContract();
+  const { write: finalizeSaleWrite } = useWriteContract();
+  const { write: cancelListingWrite } = useWriteContract();
 
   return {
     address,
     nextTokenId,
     listings,
-    listNFT,
-    buyNFT,
-    allowPublicBuyer,
-    allowPublicPrice,
-    finalizeSale,
-    cancelListing,
+    listNFT: { write: listNFTWrite },
+    buyNFT: { write: buyNFTWrite },
+    allowPublicBuyer: { write: allowPublicBuyerWrite },
+    allowPublicPrice: { write: allowPublicPriceWrite },
+    finalizeSale: { write: finalizeSaleWrite },
+    cancelListing: { write: cancelListingWrite },
     refetchListings,
     refetchNextId,
     MARKETPLACE_ADDRESS,
