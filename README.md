@@ -1,110 +1,180 @@
-# StealthNFT
+# StealthNFT - Privacy-First NFT Marketplace on Fhenix
 
-**StealthNFT** is a confidential NFT marketplace demo on **Ethereum Sepolia** using **Fhenix CoFHE**. Listing prices and buyer offers are encrypted on-chain (`euint64` handles); the marketplace contract compares them with **`FHE.gte`** without revealing plaintext amounts. Settlement uses **decrypt-with-proof** (threshold decrypt off-chain, then `finalizeSale` on-chain).
+**Buildathon Wave 2 Submission**
 
-## Product
+StealthNFT is a privacy-preserving NFT marketplace built on Fhenix testnet using Fully Homomorphic Encryption (FHE). Our platform enables users to create, list, and trade NFTs with fully encrypted metadata and prices - no one can see your data unless you choose to reveal it.
 
-Public marketplaces expose **bids and asks**, which enables **front-running**, **whale tracking**, and **strategy copying**. StealthNFT keeps **NFT metadata and ownership** visible while **price and offer amounts** stay as **ciphertext handles** until the protocol allows decryption for settlement.
+## What is StealthNFT?
 
-| Visible on-chain | Hidden / encrypted |
-|------------------|-------------------|
-| Token URI, ownership transfers, that a listing exists | Plaintext listing price and offer |
-| Marketplace events (list, attempt, sale) without amounts | Comparison via FHE on ciphertexts |
+StealthNFT solves the privacy problem in NFT marketplaces. In traditional marketplaces, all listing prices, bids, and metadata are publicly visible on-chain. This creates several issues:
 
-## Stack
+- **MEV Vulnerability**: Front-runers can see your bids and outbid you
+- **No Privacy**: Competitors can see your pricing strategy
+- **Forced Transparency**: Some data should remain private until settlement
 
-| Piece | Role |
-|--------|------|
-| **Next.js 15** (App Router) | UI, metadata, `/sign-in` & `/sign-up` hosted Clerk pages, drawer shell |
-| **Clerk** | Auth; **My listings** (`/listings`) protected by middleware |
-| **RainbowKit + wagmi + viem** | Wallet, Sepolia, contract calls |
-| **@cofhe/sdk** | Encrypt inputs, decrypt for txs with proofs |
-| **Solidity** (`contracts/`) | `StealthNFT` ERC-721 + `StealthMarketplace` FHE listing / escrow |
+Our solution uses FHE to keep prices and metadata encrypted throughout the entire transaction lifecycle.
 
-## Repository layout
+## How It Works
 
-- **`web/`** — Next.js app: `AppShell` (top bar + drawer), `SiteFooter`, Sonner toasts, Sepolia network banner, CoFHE provider.
-- **`contracts/`** — Hardhat + `@fhenixprotocol/cofhe-contracts`: deploy to Sepolia, paste addresses into `web/.env.local`.
+### Core Flow
 
-## Environment variables (`web/`)
+1. **Mint NFT** - Create an NFT with encrypted metadata (name, description, image, attributes)
+2. **List with Encrypted Price** - Encrypt your asking price client-side using FHE
+3. **Sealed Bids** - Buyers submit encrypted offers; the contract compares them without decryption
+4. **Settlement** - Seller authorizes decryption of winning buyer; transaction completes on-chain
 
-Copy `web/.env.example` to `web/.env.local` and fill values.
+### Technical Implementation
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes (for auth UI) | Clerk publishable key |
-| `CLERK_SECRET_KEY` | Yes (server / middleware) | Clerk secret — **never commit** |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Optional | Defaults to `/sign-in`; set full Vercel URL in production if needed |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Optional | Defaults to `/sign-up` |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | Yes | [WalletConnect Cloud](https://cloud.walletconnect.com) project id |
-| `NEXT_PUBLIC_NFT_ADDRESS` | After deploy | StealthNFT proxy address on Sepolia |
-| `NEXT_PUBLIC_MARKETPLACE_ADDRESS` | After deploy | StealthMarketplace proxy address on Sepolia |
-| `NEXT_PUBLIC_LOGS_FROM_BLOCK` | Optional | Deployment block; speeds up **Activity** event queries |
-
-**Clerk dashboard:** under **Paths** and **Allowed redirect URLs**, include `https://<your-domain>/sign-in`, `https://<your-domain>/sign-up`, and preview URLs if you use Vercel previews.
-
-Contracts deploy (reference): set `SEPOLIA_RPC_URL` and `DEPLOYER_PRIVATE_KEY` in `contracts/.env` (see `contracts/.env.example` if present).
-
-## Local development
-
-```bash
-cd web
-cp .env.example .env.local
-# Add Clerk, WalletConnect, and (after deploy) contract addresses
-
-npm install
-npm run dev
+```
+User Action           ->  Client-side FHE  ->  Encrypted Data  ->  On-chain Storage
+                                            (prices/bids stay encrypted)
+                                    
+Seller Authorizes     ->  Threshold Network  ->  Decryption Proof  ->  Settlement
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+### FHE Operations Used
 
-## Deploy contracts (Sepolia)
+| Operation | Smart Contract Function |
+|-----------|------------------------|
+| Encrypt | `FHE.asEuint64()` |
+| Compare | `FHE.gte(offer, price)` |
+| Select Winner | `FHE.select(condition, winner, loser)` |
+| Authorize Reveal | `FHE.allowPublic(encryptedValue)` |
+| Verify Decrypt | `FHE.getDecryptResultSafe()` |
+
+## Features (Wave 2)
+
+### Smart Contracts
+- **StealthNFT.sol**: ERC-721 with metadata storage
+- **StealthMarketplace.sol**: FHE-powered marketplace with encrypted prices/bids
+
+### Frontend
+- **Particle Effects Hero**: Animated floating particles with glowing elements
+- **Glass Morphism UI**: Modern transparent design with blur effects
+- **NFT Grid**: Hover animations, encrypted badges, modal details
+- **Mint Form**: Full metadata encryption, attribute support
+- **Multi-chain Support**: Sepolia, Arbitrum Sepolia, Base Sepolia
+
+### Wave 1 Judge Feedback
+> "Great use of FHE ops, new SDK & decrypt flow. Encrypting NFT metadata (not just price) would be a strong differentiation step for Wave 2."
+
+**Implemented from feedback:**
+- Full metadata encryption (name, description, image, price, attributes)
+- Enhanced UI with particle effects and animations
+- Improved UX flow for encrypted transactions
+
+## Deployment
+
+### Deployed Contracts (Sepolia Testnet)
+
+| Contract | Address |
+|----------|---------|
+| StealthNFT | `0xa60CBf3A438Dc82751362a2E9b3F5D95Da812099` |
+| StealthMarketplace | `0x5a0bc72F4794fb04a28d7d2eE42fc6ec3EBD71Ce` |
+
+### Links
+
+- **Live App**: Open `web/` folder and run `npm run dev`
+- **Sepolia Explorer**: https://sepolia.etherscan.io/
+- **Fhenix Docs**: https://docs.fhenix.io
+
+## Project Structure
+
+```
+StealthNFTe/
+├── contracts/           # Smart contracts
+│   ├── contracts/
+│   │   ├── StealthNFT.sol
+│   │   └── StealthMarketplace.sol
+│   ├── scripts/deploy.ts
+│   └── hardhat.config.ts
+└── web/                 # Next.js frontend
+    └── src/
+        ├── app/
+        │   ├── page.tsx          # Landing + hero
+        │   ├── marketplace/      # Browse NFTs
+        │   ├── create/          # Mint NFT
+        │   └── about/           # FHE explanation
+        ├── components/
+        │   ├── ParticleField.tsx # Animated particles
+        │   ├── Hero.tsx         # Hero section
+        │   ├── NFTGrid.tsx      # NFT marketplace
+        │   └── NFTMinter.tsx    # Mint form
+        └── hooks/
+            ├── useStealthMarketplace.ts
+            ├── useNFT.ts
+            └── useCoFHE.ts
+```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS 4 |
+| Wallet | RainbowKit v2, wagmi v2, viem |
+| Encryption | CoFHE SDK (@cofhe/sdk) |
+| Blockchain | Fhenix (Sepolia, Arbitrum Sepolia, Base Sepolia) |
+| Contracts | Solidity 0.8.28, Hardhat, OpenZeppelin |
+
+## Future Waves (Roadmap)
+
+### Wave 3 - Production Features
+- Real CoFHE SDK integration (with proper browser context)
+- WalletConnect v2 with official project ID
+- IPFS for decentralized metadata storage
+- Royalty system for creators
+
+### Wave 4 - Advanced Privacy
+- Shielded transactions for complete privacy
+- Reveal-only-on-win encrypted bidding
+- ERC-1155 multi-token support
+- Fractional ownership with FHE
+
+### Wave 5 - Enterprise
+- Gasless meta-transactions
+- Layer 2 scaling optimization
+- Oracle integration for real-time price feeds
+- Confidential DAO governance
+
+## Setup Instructions
 
 ```bash
-cd contracts
-# Configure .env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY
+# 1. Install dependencies
+cd web && npm install
+cd ../contracts && npm install
 
-npm install
-npx hardhat compile
+# 2. Deploy contracts (already done)
 npx hardhat run scripts/deploy.ts --network sepolia
+
+# 3. Update web/.env.local with contract addresses
+
+# 4. Run development server
+cd web && npm run dev
 ```
 
-Copy printed addresses into `web/.env.local` as `NEXT_PUBLIC_NFT_ADDRESS` and `NEXT_PUBLIC_MARKETPLACE_ADDRESS`.
+## Environment Variables
 
-## Deploy frontend (Vercel)
+### Contracts (.env)
+```
+SEPOLIA_RPC_URL=your_rpc_url
+DEPLOYER_PRIVATE_KEY=your_private_key
+```
 
-- Set **Root Directory** to `web/` (or monorepo equivalent).
-- Add the same env vars as in the table above in the Vercel project settings.
-- Redeploy after changing Clerk or contract addresses.
+### Web (.env.local)
+```
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_id
+NEXT_PUBLIC_SEPOLIA_RPC_URL=your_rpc_url
+NEXT_PUBLIC_NFT_ADDRESS=deployed_nft_address
+NEXT_PUBLIC_MARKETPLACE_ADDRESS=deployed_marketplace_address
+```
 
-## User flows
+## Resources
 
-1. **Connect** wallet on **Sepolia**; optional **Sign in** with Clerk for `/listings`.
-2. **Mint** (`/mint`) a demo NFT (picsum image by seed).
-3. **List** from `/nft/[id]`: approve marketplace, **encrypt** ask, `listNFT`.
-4. **Buy**: open listing, submit **encrypted offer** (`buyNFT`).
-5. **Settle**: seller **`allowPublicBuyer`** → buyer **decrypts** off-chain → **`finalizeSale`** with proof + settlement ETH.
-
-## Security
-
-- **Never commit** `.env`, `.env.local`, or private keys. Rotate keys if exposed.
-- Treat this repo as a **testnet demo**; audit contracts before mainnet.
-- Keep **Next.js** and dependencies updated; review security advisories for your stack.
-
-## Troubleshooting
-
-| Issue | What to check |
-|--------|----------------|
-| Middleware **500** / Clerk errors | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` set on Vercel; middleware skips Clerk when keys missing (dev fallback). |
-| **Wrong network** | Connect wallet to **Sepolia** (chain id `11155111`); app shows a banner when connected on another chain. |
-| **Empty marketplace** | Deploy contracts, set env addresses, mint + list from token page. |
-| **Activity slow / timeout** | Set `NEXT_PUBLIC_LOGS_FROM_BLOCK` to your deployment block. |
-| **CoFHE / IndexedDB** in build logs | SDK may log during static generation; build can still succeed. |
-
-## Documentation
-
-- **Fhenix CoFHE:** [cofhe-docs.fhenix.zone](https://cofhe-docs.fhenix.zone)
+- [Fhenix Documentation](https://docs.fhenix.io)
+- [CoFHE SDK](https://www.npmjs.com/package/@cofhe/sdk)
+- [Fhenix Examples](https://github.com/FhenixProtocol/awesome-fhenix)
+- [Buildathon Info](./wavehachk.md)
 
 ## License
 
-MIT (see SPDX headers in contract files).
+MIT

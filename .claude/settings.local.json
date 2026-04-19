@@ -6,7 +6,9 @@
       "Bash(ls -la node_modules/@cofhe/sdk/)",
       "Bash(ls -la node_modules/@cofhe/)",
       "Bash(npm show *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(npx hardhat *)",
+      "Bash(curl -s --connect-timeout 10 -o /dev/null -w \"%{http_code}\" \"https://rpc.mev.io/sepolia\")"
     ]
   }
 }

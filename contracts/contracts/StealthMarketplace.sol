@@ -135,13 +135,4 @@ contract StealthMarketplace is ERC721Holder {
         emit ListingCancelled(tokenId, li.seller);
     }
 
-    /// @notice View encrypted price handle (on-chain, no reveal)
-    function getPriceHandle(uint256 tokenId) external view returns (bytes32) {
-        return bytes32(uint256(listings[tokenId].price));
     }
-
-    /// @notice View encrypted buyer handle (on-chain, no reveal)
-    function getBuyerHandle(uint256 tokenId) external view returns (bytes32) {
-        return bytes32(uint256(pendingBuyer[tokenId]));
-    }
-}
