@@ -2,19 +2,32 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, http } from "wagmi";
-import { mainnet, sepolia, arbitrumSepolia, baseSepolia } from "wagmi/chains";
-import { RainbowKitProvider, getDefaultConfig, darkTheme } from "@rainbow-me/rainbowkit";
+import { getDefaultConfig, darkTheme } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { useState } from "react";
+import { CofheProvider, createCofheConfig } from "@cofhe/react";
 
 const config = getDefaultConfig({
   appName: "StealthNFT",
-  projectId: "YOUR_WALLETCONNECT_PROJECT_ID",
-  chains: [mainnet, sepolia, arbitrumSepolia, baseSepolia],
-  transports: {
-    [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/"),
-    [arbitrumSepolia.id]: http(process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc"),
-    [baseSepolia.id]: http(process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org"),
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo",
+  chains: [
+    { id: 11155111, name: "Sepolia", network: "sepolia", nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" }, rpcUrls: { default: { http: [process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/"] } } },
+    { id: 421614, name: "Arbitrum Sepolia", network: "arbitrum-sepolia", nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" }, rpcUrls: { default: { http: ["https://sepolia-rollup.arbitrum.io/rpc"] } } },
+    { id: 84532, name: "Base Sepolia", network: "base-sepolia", nativeCurrency: { decimals: 18, name: "ETH", symbol: "ETH" }, rpcUrls: { default: { http: ["https://sepolia.base.org"] } } },
+  ],
+});
+
+const cofheConfig = createCofheConfig({
+  fheKeyStorage: "indexeddb",
+  publicClient: {} as any,
+  walletClient: {} as any,
+  react: {
+    shareablePermits: true,
+    enableShieldUnshield: false,
+    autogeneratePermits: true,
+    defaultPermitExpirationSeconds: 3600,
+    position: "bottom-right",
+    initialTheme: "dark",
   },
 });
 
@@ -36,9 +49,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={customTheme} modalSize="compact">
-          {children}
-        </RainbowKitProvider>
+        <CofheProvider config={cofheConfig}>
+          <RainbowKitProvider theme={customTheme} modalSize="compact">
+            {children}
+          </RainbowKitProvider>
+        </CofheProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

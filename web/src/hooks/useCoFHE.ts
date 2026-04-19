@@ -1,53 +1,60 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { encrypt, decryptForTx, EncryptedRandom } from "@cofhe/sdk";
+import { useCofheEncrypt, useCofheContext } from "@cofhe/react";
+import type { EncryptedItemInput } from "@cofhe/sdk";
 
 export interface EncryptedValue {
   ciphertext: string;
   signature: string;
   random: string;
+  handle: bigint;
+}
+
+export interface EncryptedMetadata {
+  encrypted: EncryptedValue;
+  original: {
+    name: string;
+    description: string;
+    image: string;
+    price: string;
+    attributes?: Record<string, string>;
+  };
 }
 
 export function useCoFHE() {
   const [encrypting, setEncrypting] = useState(false);
   const [decrypting, setDecrypting] = useState(false);
+  const cofhe = useCofheContext();
+
+  const { mutateAsync: encryptMutation } = useCofheEncrypt();
 
   const encryptValue = useCallback(async (value: bigint | number): Promise<EncryptedValue | null> => {
     setEncrypting(true);
     try {
       const input = BigInt(value);
-      const encrypted = await encrypt({ euint64: input });
 
-      return {
-        ciphertext: encrypted.ciphertext,
-        signature: encrypted.signature,
-        random: encrypted.random || "",
-      };
+      const encrypted = await encryptMutation({
+        euint64: input,
+      });
+
+      if (encrypted && encrypted.length > 0) {
+        const result = encrypted[0] as EncryptedItemInput & { handle: bigint };
+        return {
+          ciphertext: result.ciphertext || "",
+          signature: result.signature || "",
+          random: (result.random as string) || "",
+          handle: result.handle || BigInt(0),
+        };
+      }
+      return null;
     } catch (error) {
       console.error("Encryption failed:", error);
       return null;
     } finally {
       setEncrypting(false);
     }
-  }, []);
-
-  const decryptValue = useCallback(async (encrypted: EncryptedValue): Promise<bigint | null> => {
-    setDecrypting(true);
-    try {
-      const result = await decryptForTx({
-        ciphertext: encrypted.ciphertext,
-        signature: encrypted.signature,
-        random: encrypted.random as EncryptedRandom,
-      });
-      return BigInt(result);
-    } catch (error) {
-      console.error("Decryption failed:", error);
-      return null;
-    } finally {
-      setDecrypting(false);
-    }
-  }, []);
+  }, [encryptMutation]);
 
   const encryptMetadata = useCallback(async (metadata: {
     name: string;
@@ -55,44 +62,50 @@ export function useCoFHE() {
     image: string;
     price: string;
     attributes?: Record<string, string>;
-  }): Promise<{ encrypted: EncryptedValue; original: typeof metadata } | null> => {
+  }): Promise<EncryptedMetadata | null> => {
     setEncrypting(true);
     try {
       const combinedValue = `${metadata.name}|${metadata.description}|${metadata.price}|${JSON.stringify(metadata.attributes || {})}`;
-      const hash = BigInt(keccak256String(combinedValue));
+      const hash = hashString(combinedValue);
 
-      const encrypted = await encrypt({ euint64: hash });
+      const encrypted = await encryptMutation({
+        euint64: hash,
+      });
 
-      return {
-        encrypted: {
-          ciphertext: encrypted.ciphertext,
-          signature: encrypted.signature,
-          random: encrypted.random || "",
-        },
-        original: metadata,
-      };
+      if (encrypted && encrypted.length > 0) {
+        const result = encrypted[0] as EncryptedItemInput & { handle: bigint };
+        return {
+          encrypted: {
+            ciphertext: result.ciphertext || "",
+            signature: result.signature || "",
+            random: (result.random as string) || "",
+            handle: result.handle || BigInt(0),
+          },
+          original: metadata,
+        };
+      }
+      return null;
     } catch (error) {
       console.error("Metadata encryption failed:", error);
       return null;
     } finally {
       setEncrypting(false);
     }
-  }, []);
+  }, [encryptMutation]);
 
   return {
     encryptValue,
-    decryptValue,
     encryptMetadata,
     encrypting,
     decrypting,
   };
 }
 
-function keccak256String(str: string): string {
-  let hash = "0";
+function hashString(str: string): bigint {
+  let hash = BigInt(0);
   for (let i = 0; i < str.length; i++) {
-    hash = BigInt(parseInt(hash, 16) || 0) + BigInt(str.charCodeAt(i) * 31) + BigInt(i);
-    hash = hash % BigInt(2 ** 256);
+    hash = (hash << BigInt(5)) - hash + BigInt(str.charCodeAt(i));
+    hash = hash & BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
   }
-  return hash.toString(16);
+  return hash;
 }

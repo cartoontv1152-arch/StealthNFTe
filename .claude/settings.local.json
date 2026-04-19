@@ -4,7 +4,9 @@
       "Bash(npm run *)",
       "Bash(npm install *)",
       "Bash(ls -la node_modules/@cofhe/sdk/)",
-      "Bash(ls -la node_modules/@cofhe/)"
+      "Bash(ls -la node_modules/@cofhe/)",
+      "Bash(npm show *)",
+      "Bash(npm uninstall *)"
     ]
   }
 }
