@@ -28,6 +28,8 @@ contract StealthMarketplace is ERC721Holder {
     event SalePrepared(uint256 indexed tokenId);
     event SaleFinalized(uint256 indexed tokenId, address indexed buyer, address indexed seller);
     event ListingCancelled(uint256 indexed tokenId, address indexed seller);
+    event PriceRevealed(uint256 indexed tokenId, uint256 price);
+    event BuyerRevealed(uint256 indexed tokenId, address buyer);
 
     constructor(address _nft) {
         nft = IERC721(_nft);
@@ -88,6 +90,7 @@ contract StealthMarketplace is ERC721Holder {
         require(li.active, "Stealth: not listed");
         require(msg.sender == li.seller, "Stealth: only seller");
         FHE.allowPublic(li.price);
+        emit PriceRevealed(tokenId, 0);
     }
 
     /// @notice After decrypting `pendingBuyer` off-chain (`decryptForTx`), the buyer publishes the result.
@@ -130,5 +133,15 @@ contract StealthMarketplace is ERC721Holder {
         li.active = false;
         nft.safeTransferFrom(address(this), li.seller, tokenId);
         emit ListingCancelled(tokenId, li.seller);
+    }
+
+    /// @notice View encrypted price handle (on-chain, no reveal)
+    function getPriceHandle(uint256 tokenId) external view returns (bytes32) {
+        return bytes32(uint256(listings[tokenId].price));
+    }
+
+    /// @notice View encrypted buyer handle (on-chain, no reveal)
+    function getBuyerHandle(uint256 tokenId) external view returns (bytes32) {
+        return bytes32(uint256(pendingBuyer[tokenId]));
     }
 }

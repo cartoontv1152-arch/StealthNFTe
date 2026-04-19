@@ -1,9 +1,11 @@
 import { createPublicClient, http, parseAbi } from "viem";
 import { sepolia, arbitrumSepolia, baseSepolia } from "viem/chains";
 
+// Fhenix custom types for encrypted inputs - these are handled by the CoFHE SDK
+// Using tuple representation for encrypted types
 export const MARKETPLACE_ABI = parseAbi([
-  "function listNFT(uint256 tokenId, InEuint64 calldata encPrice) external",
-  "function buyNFT(uint256 tokenId, InEuint64 calldata encOffer) external",
+  "function listNFT(uint256 tokenId, bytes calldata encPrice) external",
+  "function buyNFT(uint256 tokenId, bytes calldata encOffer) external",
   "function allowPublicBuyer(uint256 tokenId) external",
   "function allowPublicPrice(uint256 tokenId) external",
   "function finalizeSale(uint256 tokenId, address buyerPlain, bytes calldata buyerSig) external payable",

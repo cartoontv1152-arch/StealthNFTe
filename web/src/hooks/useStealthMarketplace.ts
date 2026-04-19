@@ -1,6 +1,6 @@
 "use client";
 
-import { useContractRead, useWriteContract, useAccount } from "wagmi";
+import { useContractRead, useAccount } from "wagmi";
 import { MARKETPLACE_ABI, NFT_ABI } from "@/lib/contracts";
 
 const MARKETPLACE_ADDRESS = process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS as `0x${string}`;
@@ -30,23 +30,10 @@ export function useStealthMarketplace() {
     args: [BigInt(1)],
   });
 
-  const { write: listNFTWrite } = useWriteContract();
-  const { write: buyNFTWrite } = useWriteContract();
-  const { write: allowPublicBuyerWrite } = useWriteContract();
-  const { write: allowPublicPriceWrite } = useWriteContract();
-  const { write: finalizeSaleWrite } = useWriteContract();
-  const { write: cancelListingWrite } = useWriteContract();
-
   return {
     address,
     nextTokenId,
     listings,
-    listNFT: { write: listNFTWrite },
-    buyNFT: { write: buyNFTWrite },
-    allowPublicBuyer: { write: allowPublicBuyerWrite },
-    allowPublicPrice: { write: allowPublicPriceWrite },
-    finalizeSale: { write: finalizeSaleWrite },
-    cancelListing: { write: cancelListingWrite },
     refetchListings,
     refetchNextId,
     MARKETPLACE_ADDRESS,

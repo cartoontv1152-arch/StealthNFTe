@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { toast } from "sonner";
 import { useNFT } from "@/hooks/useNFT";
 import { useCoFHE } from "@/hooks/useCoFHE";
-import { useWaitForTransactionReceipt } from "wagmi";
+import { NFT_ABI } from "@/lib/contracts";
 
 export function NFTMinter() {
   const { address, isConnected } = useAccount();
   const { mint } = useNFT();
   const { encryptMetadata, encrypting } = useCoFHE();
+  const writeContract = useWriteContract();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -63,8 +64,13 @@ export function NFTMinter() {
       encrypted: !!encrypted,
     }))}`;
 
-    if (address) {
-      mint.write({ args: [address, uri] });
+    if (address && process.env.NEXT_PUBLIC_NFT_ADDRESS) {
+      writeContract.writeContract({
+        address: process.env.NEXT_PUBLIC_NFT_ADDRESS as `0x${string}`,
+        abi: NFT_ABI,
+        functionName: "mint",
+        args: [address, uri],
+      });
     }
   };
 

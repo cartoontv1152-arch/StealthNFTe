@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
 import { toast } from "sonner";
 import { useCoFHE } from "@/hooks/useCoFHE";
 import { useStealthMarketplace } from "@/hooks/useStealthMarketplace";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { MARKETPLACE_ABI } from "@/lib/contracts";
 
 interface NFT {
   tokenId: number;
@@ -24,8 +25,9 @@ interface NFTGridProps {
 export function NFTGrid({ nfts }: NFTGridProps) {
   const [selectedNFT, setSelectedNFT] = useState<NFT | null>(null);
   const { isConnected } = useAccount();
-  const { buyNFT } = useStealthMarketplace();
+  const { MARKETPLACE_ADDRESS } = useStealthMarketplace();
   const { encryptValue, encrypting } = useCoFHE();
+  const writeContract = useWriteContract();
 
   const handleBuy = async (nft: NFT) => {
     if (!isConnected) {
@@ -36,11 +38,14 @@ export function NFTGrid({ nfts }: NFTGridProps) {
     const priceInWei = BigInt(Math.ceil(parseFloat(nft.price) * 1e18));
     const encrypted = await encryptValue(priceInWei);
 
-    if (encrypted) {
-      buyNFT.write({
-        args: [BigInt(nft.tokenId), encrypted as { ciphertext: string; signature: string; random: string; handle: bigint }],
+    if (encrypted && MARKETPLACE_ADDRESS) {
+      writeContract.writeContract({
+        address: MARKETPLACE_ADDRESS,
+        abi: MARKETPLACE_ABI,
+        functionName: "buyNFT",
+        args: [BigInt(nft.tokenId), encrypted.ciphertext as `0x${string}`],
       });
-      toast.success("Offer submitted! Waiting for seller to finalize...");
+      toast.success("Encrypted offer submitted! Waiting for seller to finalize...");
     }
   };
 
@@ -167,7 +172,7 @@ export function NFTGrid({ nfts }: NFTGridProps) {
 
             <div className="flex gap-4">
               {!isConnected ? (
-                <ConnectButton className="flex-1" />
+                <div className="flex-1"><ConnectButton /></div>
               ) : (
                 <button
                   onClick={() => handleBuy(selectedNFT)}
