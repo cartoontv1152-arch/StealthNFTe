@@ -17,3 +17,6 @@ web/components
 web/hooks
 web/lib
 .vercel
+
+
+.gitignore
