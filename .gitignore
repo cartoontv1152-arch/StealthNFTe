@@ -6,16 +6,7 @@ web/node_modules
 .env.local.example
 web/.next
 web/node_modules
-web/out
-web/build
-web/dist
-web/public
-web/src
-web/styles
-web/utils
-web/components
-web/hooks
-web/lib
+ 
 .vercel
 
 
