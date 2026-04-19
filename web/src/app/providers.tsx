@@ -1,8 +1,8 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider, http } from "wagmi";
-import { getDefaultConfig, darkTheme } from "@rainbow-me/rainbowkit";
+import { WagmiProvider } from "wagmi";
+import { getDefaultConfig, darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { useState } from "react";
 import type { Config as ChainConfig } from "viem";

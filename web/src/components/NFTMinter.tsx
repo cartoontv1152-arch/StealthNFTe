@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useContractWrite, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount } from "wagmi";
+import { toast } from "sonner";
 import { useNFT } from "@/hooks/useNFT";
 import { useCoFHE } from "@/hooks/useCoFHE";
-import { toast } from "sonner";
-
-const MINT_PRICE = "0.01";
+import { useWaitForTransactionReceipt } from "wagmi";
 
 export function NFTMinter() {
   const { address, isConnected } = useAccount();
-  const { mint, isLoading: minting } = useNFT();
+  const { mint } = useNFT();
   const { encryptMetadata, encrypting } = useCoFHE();
 
   const [name, setName] = useState("");
@@ -64,7 +63,9 @@ export function NFTMinter() {
       encrypted: !!encrypted,
     }))}`;
 
-    mint.write({ args: [address, uri] });
+    if (address) {
+      mint.write({ args: [address, uri] });
+    }
   };
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -195,10 +196,10 @@ export function NFTMinter() {
         <div className="pt-4">
           <button
             onClick={handleMint}
-            disabled={minting || encrypting || isConfirming}
+            disabled={mint.isPending || encrypting || isConfirming}
             className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all flex items-center justify-center gap-2"
           >
-            {(minting || encrypting || isConfirming) ? (
+            {(mint.isPending || encrypting || isConfirming) ? (
               <>
                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

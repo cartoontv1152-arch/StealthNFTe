@@ -24,7 +24,7 @@ interface NFTGridProps {
 export function NFTGrid({ nfts }: NFTGridProps) {
   const [selectedNFT, setSelectedNFT] = useState<NFT | null>(null);
   const { isConnected } = useAccount();
-  const { buyNFT, listNFT } = useStealthMarketplace();
+  const { buyNFT } = useStealthMarketplace();
   const { encryptValue, encrypting } = useCoFHE();
 
   const handleBuy = async (nft: NFT) => {
@@ -38,7 +38,7 @@ export function NFTGrid({ nfts }: NFTGridProps) {
 
     if (encrypted) {
       buyNFT.write({
-        args: [BigInt(nft.tokenId), encrypted as any],
+        args: [BigInt(nft.tokenId), encrypted as { ciphertext: string; signature: string; random: string; handle: bigint }],
       });
       toast.success("Offer submitted! Waiting for seller to finalize...");
     }

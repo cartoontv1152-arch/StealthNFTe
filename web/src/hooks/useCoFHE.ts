@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { createCofheClient, createCofheConfig, FheTypes, EncryptedItemInput } from "@cofhe/sdk";
-import type { PublicClient, WalletClient } from "viem";
+import { createCofheClientBase, CofheConfig } from "@cofhe/sdk";
 
 export interface EncryptedValue {
   ciphertext: string;
@@ -23,20 +22,19 @@ export interface EncryptedMetadata {
   };
 }
 
-let cofheClient: ReturnType<typeof createCofheClient> | null = null;
+let cofheClient: Awaited<ReturnType<typeof createCofheClientBase>> | null = null;
 
 export function useCoFHE() {
   const [encrypting, setEncrypting] = useState(false);
-  const [decrypting, setDecrypting] = useState(false);
 
   const getClient = useCallback(() => {
     if (!cofheClient) {
-      const cofheConfig = createCofheConfig({
+      const config: CofheConfig = {
         fheKeyStorage: "in-memory",
-        publicClient: null as unknown as PublicClient,
-        walletClient: null as unknown as WalletClient,
-      });
-      cofheClient = createCofheClient(cofheConfig);
+        publicClient: null as unknown as Parameters<typeof createCofheClientBase>[0]["publicClient"],
+        walletClient: null as unknown as Parameters<typeof createCofheClientBase>[0]["walletClient"],
+      };
+      cofheClient = createCofheClientBase(config);
     }
     return cofheClient;
   }, []);
@@ -103,7 +101,7 @@ export function useCoFHE() {
     encryptValue,
     encryptMetadata,
     encrypting,
-    decrypting,
+    decrypting: false,
   };
 }
 
