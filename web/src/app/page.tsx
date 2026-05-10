@@ -1,100 +1,105 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { Navigation } from "@/components/Navigation";
-import { Hero } from "@/components/Hero";
+import Link from "next/link";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { PageShell } from "@/components/PageShell";
+import { useStealthMarketplace } from "@/hooks/useStealthMarketplace";
+
+const privacyFlow = [
+  { step: "Mint", body: "Public preview metadata is stored with a privacy commitment." },
+  { step: "Encrypt", body: "The reserve is encrypted in-browser with the CoFHE SDK." },
+  { step: "Bid", body: "Collectors submit sealed offers that the contract compares while encrypted." },
+  { step: "Settle", body: "The winning buyer and amount are revealed only with threshold proofs." },
+];
 
 export default function Home() {
+  const { nfts, activeListings, isLoading } = useStealthMarketplace();
+  const featured = nfts.find((nft) => nft.listingActive) || nfts[0];
+
   return (
-    <main className="relative min-h-screen">
-      <Navigation />
-      <Hero />
-
-      <section className="py-24 px-4 relative z-10">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl font-bold text-center mb-4 gradient-text font-['Syne']">
-            How FHE Powers StealthNFT
-          </h2>
-          <p className="text-slate-400 text-center mb-16 max-w-2xl mx-auto">
-            Traditional marketplaces expose everything. We encrypt everything.
+    <PageShell>
+      <section className="grid gap-6 pb-10 pt-3 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
+        <div className="animate-reveal">
+          <span className="eyebrow">Wave 4 ready on Fhenix Sepolia</span>
+          <h1 className="section-title mt-5 max-w-4xl text-[rgb(var(--ink))]">
+            StealthNFT
+          </h1>
+          <p className="mt-5 max-w-2xl text-xl leading-8 text-[rgb(var(--muted))]">
+            A confidential NFT marketplace for encrypted reserves, sealed offers, royalty-aware settlement, and selective disclosure.
           </p>
 
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="glass rounded-2xl p-8 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl"></div>
-              <h3 className="text-xl font-bold text-white mb-4 font-['Syne']">Encrypted Prices</h3>
-              <p className="text-slate-400 mb-4">
-                Listing prices are encrypted using FHE. No one can see the price until the seller reveals it.
-              </p>
-              <code className="text-sm text-purple-400 bg-black/30 px-3 py-2 rounded-lg block">
-                FHE.asEuint64(encPrice)
-              </code>
-            </div>
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
+            <Link href="/marketplace" className="btn-primary">
+              Open marketplace
+            </Link>
+            <Link href="/create" className="btn-secondary">
+              Mint listing
+            </Link>
+          </div>
+        </div>
 
-            <div className="glass rounded-2xl p-8 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl"></div>
-              <h3 className="text-xl font-bold text-white mb-4 font-['Syne']">Sealed Bids</h3>
-              <p className="text-slate-400 mb-4">
-                Offers are encrypted. The contract compares offers without decrypting them.
-              </p>
-              <code className="text-sm text-cyan-400 bg-black/30 px-3 py-2 rounded-lg block">
-                FHE.gte(offer, price)
-              </code>
+        <div className="panel overflow-hidden animate-reveal [animation-delay:120ms]">
+          <div className="aspect-[4/3] bg-[rgb(var(--surface))]">
+            <img
+              src={featured?.image || "https://picsum.photos/seed/stealth-featured/900/700"}
+              alt={featured?.name || "StealthNFT featured artwork"}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="grid grid-cols-3 border-t border-[rgb(var(--line))] text-center">
+            <div className="p-4">
+              <p className="text-2xl font-extrabold text-[rgb(var(--ink))]">{activeListings.length}</p>
+              <p className="text-xs font-bold text-[rgb(var(--muted))]">Listed</p>
             </div>
-
-            <div className="glass rounded-2xl p-8 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-pink-500/10 rounded-full blur-3xl"></div>
-              <h3 className="text-xl font-bold text-white mb-4 font-['Syne']">Private Metadata</h3>
-              <p className="text-slate-400 mb-4">
-                NFT metadata is encrypted. Only the owner can reveal specific details.
-              </p>
-              <code className="text-sm text-pink-400 bg-black/30 px-3 py-2 rounded-lg block">
-                EncryptedTokenURI
-              </code>
+            <div className="border-x border-[rgb(var(--line))] p-4">
+              <p className="text-2xl font-extrabold text-[rgb(var(--ink))]">{nfts.length}</p>
+              <p className="text-xs font-bold text-[rgb(var(--muted))]">NFTs</p>
             </div>
-
-            <div className="glass rounded-2xl p-8 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-3xl"></div>
-              <h3 className="text-xl font-bold text-white mb-4 font-['Syne']">Selective Disclosure</h3>
-              <p className="text-slate-400 mb-4">
-                Sellers choose when to reveal prices and metadata. Full control over your data.
-              </p>
-              <code className="text-sm text-green-400 bg-black/30 px-3 py-2 rounded-lg block">
-                FHE.allowPublic()
-              </code>
+            <div className="p-4">
+              <p className="text-2xl font-extrabold text-[rgb(var(--ink))]">{isLoading ? "..." : "FHE"}</p>
+              <p className="text-xs font-bold text-[rgb(var(--muted))]">Mode</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="py-24 px-4 relative z-10 border-t border-white/5">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-6 font-['Syne']">Ready to Start?</h2>
-          <p className="text-xl text-slate-400 mb-10">
-            Connect your wallet and start trading on the first privacy-preserving NFT marketplace.
-          </p>
-          <a
-            href="/marketplace"
-            className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold hover:opacity-90 transition-opacity"
-          >
-            Explore Marketplace
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
-          </a>
-        </div>
+      <section className="grid gap-4 py-8 md:grid-cols-4">
+        {privacyFlow.map((item) => (
+          <article key={item.step} className="panel p-5">
+            <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--teal))]">{item.step}</p>
+            <p className="mt-3 text-base leading-7 text-[rgb(var(--muted))]">{item.body}</p>
+          </article>
+        ))}
       </section>
 
-      <footer className="py-8 px-4 border-t border-white/5 relative z-10">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-bold gradient-text font-['Syne']">StealthNFT</span>
-            <span className="text-slate-500 text-sm">Built on Fhenix</span>
-          </div>
-          <div className="text-slate-500 text-sm">
-            Powered by Fully Homomorphic Encryption
+      <section className="grid gap-6 py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div>
+          <span className="eyebrow">Product surface</span>
+          <h2 className="mt-5 text-4xl text-[rgb(var(--ink))]">Built around the actual privacy lifecycle.</h2>
+          <p className="mt-4 text-base leading-7 text-[rgb(var(--muted))]">
+            The app now exposes the full path from encrypted listing creation to seller reveal and buyer settlement.
+          </p>
+        </div>
+
+        <div className="panel privacy-band p-5 sm:p-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="text-3xl font-extrabold text-[rgb(var(--ink))]">CoFHE SDK</p>
+              <p className="mt-2 text-sm leading-6 text-[rgb(var(--muted))]">Browser encryption through signed encrypted inputs.</p>
+            </div>
+            <div>
+              <p className="text-3xl font-extrabold text-[rgb(var(--ink))]">ERC-2981</p>
+              <p className="mt-2 text-sm leading-6 text-[rgb(var(--muted))]">Creator royalties are honored during private settlement.</p>
+            </div>
+            <div>
+              <p className="text-3xl font-extrabold text-[rgb(var(--ink))]">Reveal on win</p>
+              <p className="mt-2 text-sm leading-6 text-[rgb(var(--muted))]">Only the encrypted winner and winning offer enter the decrypt flow.</p>
+            </div>
           </div>
         </div>
-      </footer>
-    </main>
+      </section>
+    </PageShell>
   );
 }

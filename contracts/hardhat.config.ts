@@ -5,6 +5,8 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY || process.env.PRIVATE_KEY;
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.28",
@@ -18,23 +20,17 @@ const config: HardhatUserConfig = {
     },
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || "",
-      accounts: process.env.DEPLOYER_PRIVATE_KEY
-        ? [process.env.DEPLOYER_PRIVATE_KEY]
-        : [],
+      accounts: deployerPrivateKey ? [deployerPrivateKey] : [],
       timeout: 300000,
     },
     arbitrumSepolia: {
       url: "https://sepolia-rollup.arbitrum.io/rpc",
-      accounts: process.env.DEPLOYER_PRIVATE_KEY
-        ? [process.env.DEPLOYER_PRIVATE_KEY]
-        : [],
+      accounts: deployerPrivateKey ? [deployerPrivateKey] : [],
       timeout: 300000,
     },
     baseSepolia: {
       url: "https://sepolia.base.org",
-      accounts: process.env.DEPLOYER_PRIVATE_KEY
-        ? [process.env.DEPLOYER_PRIVATE_KEY]
-        : [],
+      accounts: deployerPrivateKey ? [deployerPrivateKey] : [],
       timeout: 300000,
     },
   },

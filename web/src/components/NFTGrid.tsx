@@ -1,194 +1,332 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState } from "react";
-import { useAccount, useWriteContract } from "wagmi";
-import { toast } from "sonner";
-import { useCoFHE } from "@/hooks/useCoFHE";
-import { useStealthMarketplace } from "@/hooks/useStealthMarketplace";
+import { useMemo, useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { MARKETPLACE_ABI } from "@/lib/contracts";
-
-interface NFT {
-  tokenId: number;
-  name: string;
-  description: string;
-  image: string;
-  price: string;
-  seller: string;
-  encrypted: boolean;
-}
+import { toast } from "sonner";
+import { formatEther, getAddress, parseEther } from "viem";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { useCoFHE } from "@/hooks/useCoFHE";
+import { shortAddress, type MarketplaceNFT } from "@/hooks/useStealthMarketplace";
+import { APP_CHAIN_ID, MARKETPLACE_ABI, MARKETPLACE_ADDRESS, MAX_ENCRYPTED_WEI } from "@/lib/contracts";
 
 interface NFTGridProps {
-  nfts: NFT[];
+  nfts: MarketplaceNFT[];
+  onRefresh?: () => Promise<void> | void;
 }
 
-export function NFTGrid({ nfts }: NFTGridProps) {
-  const [selectedNFT, setSelectedNFT] = useState<NFT | null>(null);
-  const { isConnected } = useAccount();
-  const { MARKETPLACE_ADDRESS } = useStealthMarketplace();
-  const { encryptValue, encrypting } = useCoFHE();
-  const writeContract = useWriteContract();
+type RevealedSettlement = {
+  buyer: `0x${string}`;
+  offer: bigint;
+};
 
-  const handleBuy = async (nft: NFT) => {
-    if (!isConnected) {
-      toast.error("Please connect your wallet");
+export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
+  const [selected, setSelected] = useState<MarketplaceNFT | null>(null);
+  const [offerAmount, setOfferAmount] = useState("");
+  const [revealed, setRevealed] = useState<RevealedSettlement | null>(null);
+  const [action, setAction] = useState<string | null>(null);
+  const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient({ chainId: APP_CHAIN_ID });
+  const { writeContractAsync } = useWriteContract();
+  const { encryptUint64, decryptAddressForTx, decryptUint64ForTx, busy, status } = useCoFHE();
+
+  const selectedIsSeller = useMemo(
+    () => Boolean(selected && address && selected.seller.toLowerCase() === address.toLowerCase()),
+    [address, selected]
+  );
+
+  const waitAndRefresh = async (hash: `0x${string}`) => {
+    if (!publicClient) {
       return;
     }
 
-    const priceInWei = BigInt(Math.ceil(parseFloat(nft.price) * 1e18));
-    const encrypted = await encryptValue(priceInWei);
+    await publicClient.waitForTransactionReceipt({ hash });
+    await onRefresh?.();
+  };
 
-    if (encrypted && MARKETPLACE_ADDRESS) {
-      writeContract.writeContract({
+  const submitOffer = async (nft: MarketplaceNFT) => {
+    if (!isConnected || !address) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    if (!nft.listingActive) {
+      toast.error("This NFT is not actively listed.");
+      return;
+    }
+
+    let offerWei: bigint;
+    try {
+      offerWei = parseEther(offerAmount || "0");
+    } catch {
+      toast.error("Enter a valid offer amount.");
+      return;
+    }
+
+    if (offerWei <= 0n) {
+      toast.error("Offer amount must be greater than zero.");
+      return;
+    }
+
+    if (offerWei > MAX_ENCRYPTED_WEI) {
+      toast.error("Encrypted uint64 offers support up to about 18.44 ETH.");
+      return;
+    }
+
+    setAction("Encrypting sealed offer");
+    try {
+      const encryptedOffer = await encryptUint64(offerWei);
+      const contractOffer = { ...encryptedOffer, signature: encryptedOffer.signature as `0x${string}` };
+      setAction("Submitting sealed offer");
+      const hash = await writeContractAsync({
         address: MARKETPLACE_ADDRESS,
         abi: MARKETPLACE_ABI,
-        functionName: "buyNFT",
-        args: [BigInt(nft.tokenId), encrypted.ciphertext as `0x${string}`],
+        functionName: "submitSealedOffer",
+        args: [BigInt(nft.tokenId), contractOffer],
       });
-      toast.success("Encrypted offer submitted! Waiting for seller to finalize...");
+      await waitAndRefresh(hash);
+      toast.success("Sealed offer submitted.");
+      setOfferAmount("");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Offer submission failed.");
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const prepareReveal = async (nft: MarketplaceNFT) => {
+    setAction("Preparing reveal");
+    try {
+      const hash = await writeContractAsync({
+        address: MARKETPLACE_ADDRESS,
+        abi: MARKETPLACE_ABI,
+        functionName: "prepareSaleReveal",
+        args: [BigInt(nft.tokenId)],
+      });
+      await waitAndRefresh(hash);
+      toast.success("Winning buyer and offer are ready for threshold decryption.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Reveal preparation failed.");
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const cancelListing = async (nft: MarketplaceNFT) => {
+    setAction("Cancelling listing");
+    try {
+      const hash = await writeContractAsync({
+        address: MARKETPLACE_ADDRESS,
+        abi: MARKETPLACE_ABI,
+        functionName: "cancelListing",
+        args: [BigInt(nft.tokenId)],
+      });
+      await waitAndRefresh(hash);
+      toast.success("Listing cancelled.");
+      setSelected(null);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Cancel failed.");
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const finalizeSale = async (nft: MarketplaceNFT) => {
+    if (!address) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    if (!nft.revealPrepared) {
+      toast.error("Seller must prepare the sale reveal first.");
+      return;
+    }
+
+    setAction("Decrypting settlement proof");
+    try {
+      const [buyerResult, offerResult] = await Promise.all([
+        decryptAddressForTx(nft.pendingBuyerHandle),
+        decryptUint64ForTx(nft.highestOfferHandle),
+      ]);
+
+      const buyer = getAddress(buyerResult.decryptedValue) as `0x${string}`;
+      const offer = offerResult.decryptedValue;
+      setRevealed({ buyer, offer });
+
+      if (buyer.toLowerCase() !== address.toLowerCase()) {
+        toast.error(`Winning buyer is ${shortAddress(buyer)}.`);
+        return;
+      }
+
+      setAction("Finalizing sale");
+      const hash = await writeContractAsync({
+        address: MARKETPLACE_ADDRESS,
+        abi: MARKETPLACE_ABI,
+        functionName: "finalizeSale",
+        args: [BigInt(nft.tokenId), buyer, buyerResult.signature as `0x${string}`, offer, offerResult.signature as `0x${string}`],
+        value: offer,
+      });
+      await waitAndRefresh(hash);
+      toast.success("Sale finalized on-chain.");
+      setSelected(null);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Settlement failed.");
+    } finally {
+      setAction(null);
     }
   };
 
   if (nfts.length === 0) {
     return (
-      <div className="text-center py-20">
-        <div className="text-5xl mb-4">🔍</div>
-        <h3 className="text-xl font-bold text-white mb-2">No NFTs Found</h3>
-        <p className="text-slate-400">Try adjusting your search or filters</p>
+      <div className="panel px-6 py-14 text-center">
+        <h3 className="text-3xl text-[rgb(var(--ink))]">No on-chain NFTs found yet.</h3>
+        <p className="mx-auto mt-3 max-w-md text-base leading-7 text-[rgb(var(--muted))]">
+          Mint and list a collectible to populate the live marketplace index.
+        </p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {nfts.map((nft) => (
-          <div
-            key={nft.tokenId}
-            className="glass rounded-2xl overflow-hidden group hover:scale-[1.02] transition-all duration-300 cursor-pointer"
-            onClick={() => setSelectedNFT(nft)}
-          >
-            <div className="relative aspect-square overflow-hidden">
-              <img
-                src={nft.image}
-                alt={nft.name}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              />
-              <div className="absolute top-4 right-4">
-                <span className="px-3 py-1 rounded-full glass text-xs font-medium text-cyan-400 flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Encrypted
-                </span>
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-
-            <div className="p-5">
-              <h3 className="text-lg font-bold text-white mb-2 truncate">{nft.name}</h3>
-              <p className="text-slate-400 text-sm mb-4 line-clamp-2">{nft.description}</p>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">Listing Price</p>
-                  <p className="text-xl font-bold gradient-text">{nft.price}</p>
+          <article key={nft.tokenId} className="panel group overflow-hidden transition-transform duration-200 hover:-translate-y-1">
+            <button
+              type="button"
+              className="block w-full text-left"
+              onClick={() => {
+                setSelected(nft);
+                setRevealed(null);
+                setOfferAmount("");
+              }}
+            >
+              <div className="relative aspect-square overflow-hidden border-b border-[rgb(var(--line))] bg-[rgb(var(--surface))]">
+                <img src={nft.image} alt={nft.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                  <span className="status-pill bg-[rgb(var(--surface)/0.92)]">{nft.listingActive ? "Listed" : "Owned"}</span>
+                  {nft.encrypted ? <span className="status-pill bg-[rgb(var(--surface)/0.92)]">Encrypted</span> : null}
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleBuy(nft);
-                  }}
-                  disabled={encrypting}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {encrypting ? "Encrypting..." : "Buy Now"}
-                </button>
               </div>
-
-              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-slate-500">
-                <span>Token #{nft.tokenId}</span>
-                <span>Seller: {nft.seller}</span>
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-2xl text-[rgb(var(--ink))]">{nft.name}</h3>
+                    <p className="mt-1 text-sm font-bold text-[rgb(var(--muted))]">Token #{nft.tokenId}</p>
+                  </div>
+                  <span className="rounded-lg bg-[rgb(var(--gold)/0.18)] px-3 py-1 text-sm font-extrabold text-[rgb(var(--ink))]">
+                    {nft.displayPrice}
+                  </span>
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm leading-6 text-[rgb(var(--muted))]">{nft.description}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[rgb(var(--line))] pt-4 text-sm">
+                  <p>
+                    <span className="block font-extrabold text-[rgb(var(--ink))]">{nft.bidCount}</span>
+                    <span className="text-[rgb(var(--muted))]">sealed offers</span>
+                  </p>
+                  <p>
+                    <span className="block font-extrabold text-[rgb(var(--ink))]">{shortAddress(nft.seller)}</span>
+                    <span className="text-[rgb(var(--muted))]">seller</span>
+                  </p>
+                </div>
               </div>
-            </div>
-          </div>
+            </button>
+          </article>
         ))}
       </div>
 
-      {selectedNFT && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          onClick={() => setSelectedNFT(null)}
-        >
-          <div
-            className="glass-strong rounded-3xl max-w-lg w-full p-8 relative animate-reveal-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setSelectedNFT(null)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            <div className="relative rounded-2xl overflow-hidden mb-6">
-              <img
-                src={selectedNFT.image}
-                alt={selectedNFT.name}
-                className="w-full aspect-square object-cover"
-              />
-              <div className="absolute top-4 left-4">
-                <span className="px-3 py-1 rounded-full bg-purple-500/80 text-white text-xs font-medium flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  FHE Encrypted
-                </span>
-              </div>
-            </div>
-
-            <h2 className="text-2xl font-bold text-white mb-2 font-['Syne']">{selectedNFT.name}</h2>
-            <p className="text-slate-400 mb-6">{selectedNFT.description}</p>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="glass rounded-xl p-4">
-                <p className="text-xs text-slate-500 mb-1">Price (Encrypted)</p>
-                <p className="text-xl font-bold gradient-text">{selectedNFT.price}</p>
-              </div>
-              <div className="glass rounded-xl p-4">
-                <p className="text-xs text-slate-500 mb-1">Token ID</p>
-                <p className="text-lg font-semibold text-white">#{selectedNFT.tokenId}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 mb-6 text-sm text-slate-400">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              Price is encrypted on-chain. Seller must reveal to complete sale.
-            </div>
-
-            <div className="flex gap-4">
-              {!isConnected ? (
-                <div className="flex-1"><ConnectButton /></div>
-              ) : (
+      {selected ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(var(--ink)/0.35)] p-4 backdrop-blur-sm" onClick={() => setSelected(null)}>
+          <div className="panel max-h-[92vh] w-full max-w-5xl overflow-auto" onClick={(event) => event.stopPropagation()}>
+            <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="relative min-h-[320px] bg-[rgb(var(--surface))]">
+                <img src={selected.image} alt={selected.name} className="h-full max-h-[720px] w-full object-cover" />
                 <button
-                  onClick={() => handleBuy(selectedNFT)}
-                  disabled={encrypting}
-                  className="flex-1 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--surface)/0.92)] font-extrabold text-[rgb(var(--ink))]"
+                  aria-label="Close"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  {encrypting ? "Encrypting Offer..." : "Place Encrypted Offer"}
+                  X
                 </button>
-              )}
+              </div>
+
+              <div className="flex flex-col gap-5 p-5">
+                <div>
+                  <span className="eyebrow">{selected.listingActive ? "Private listing" : "Collection item"}</span>
+                  <h2 className="mt-4 text-4xl text-[rgb(var(--ink))]">{selected.name}</h2>
+                  <p className="mt-3 text-base leading-7 text-[rgb(var(--muted))]">{selected.description}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="metric-card">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--muted))]">Price</p>
+                    <p className="mt-2 text-xl font-extrabold text-[rgb(var(--ink))]">{selected.displayPrice}</p>
+                  </div>
+                  <div className="metric-card">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--muted))]">Offers</p>
+                    <p className="mt-2 text-xl font-extrabold text-[rgb(var(--ink))]">{selected.bidCount}</p>
+                  </div>
+                  <div className="metric-card">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--muted))]">Seller</p>
+                    <p className="mt-2 text-base font-extrabold text-[rgb(var(--ink))]">{shortAddress(selected.seller)}</p>
+                  </div>
+                  <div className="metric-card">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--muted))]">Reveal</p>
+                    <p className="mt-2 text-base font-extrabold text-[rgb(var(--ink))]">{selected.revealPrepared ? "Prepared" : "Sealed"}</p>
+                  </div>
+                </div>
+
+                {revealed ? (
+                  <div className="border border-[rgb(var(--line))] bg-[rgb(var(--paper))] p-4">
+                    <p className="text-sm font-extrabold text-[rgb(var(--ink))]">Latest decrypt result</p>
+                    <p className="mt-2 text-sm text-[rgb(var(--muted))]">
+                      Buyer {shortAddress(revealed.buyer)} at {formatEther(revealed.offer)} ETH
+                    </p>
+                  </div>
+                ) : null}
+
+                {!isConnected ? (
+                  <div className="border-t border-[rgb(var(--line))] pt-5">
+                    <ConnectButton showBalance={false} />
+                  </div>
+                ) : selectedIsSeller ? (
+                  <div className="grid gap-3 border-t border-[rgb(var(--line))] pt-5">
+                    <button disabled={!selected.bidReceived || selected.revealPrepared || busy || Boolean(action)} onClick={() => prepareReveal(selected)} className="btn-primary disabled:opacity-55">
+                      Prepare winning reveal
+                    </button>
+                    <button disabled={selected.bidReceived || busy || Boolean(action)} onClick={() => cancelListing(selected)} className="btn-danger disabled:opacity-55">
+                      Cancel listing
+                    </button>
+                  </div>
+                ) : selected.listingActive ? (
+                  <div className="grid gap-3 border-t border-[rgb(var(--line))] pt-5">
+                    <label className="field-label">Sealed offer</label>
+                    <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                      <div className="relative">
+                        <input value={offerAmount} onChange={(event) => setOfferAmount(event.target.value)} placeholder="0.18" type="number" min="0" step="0.001" className="field pr-16" />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[rgb(var(--muted))]">ETH</span>
+                      </div>
+                      <button disabled={busy || Boolean(action)} onClick={() => submitOffer(selected)} className="btn-primary disabled:opacity-55">
+                        Place offer
+                      </button>
+                    </div>
+                    <button disabled={!selected.revealPrepared || busy || Boolean(action)} onClick={() => finalizeSale(selected)} className="btn-secondary disabled:opacity-55">
+                      Finalize if winning
+                    </button>
+                  </div>
+                ) : null}
+
+                <p className="min-h-6 text-sm font-semibold text-[rgb(var(--muted))]">{action || status?.label || ""}</p>
+              </div>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 }

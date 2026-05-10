@@ -1,240 +1,311 @@
 "use client";
 
-import { useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useMemo, useState } from "react";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { toast } from "sonner";
-import { useNFT } from "@/hooks/useNFT";
+import { parseEther } from "viem";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { useCoFHE } from "@/hooks/useCoFHE";
-import { NFT_ABI } from "@/lib/contracts";
+import {
+  APP_CHAIN_ID,
+  MARKETPLACE_ABI,
+  MARKETPLACE_ADDRESS,
+  MAX_ENCRYPTED_WEI,
+  NFT_ABI,
+  NFT_ADDRESS,
+  hasContractConfig,
+} from "@/lib/contracts";
+import { buildTokenMetadata, uploadMetadata, type NftAttribute } from "@/lib/metadata";
+
+type MintStep = "idle" | "metadata" | "mint" | "approve" | "encrypt" | "list" | "done";
+
+const stepLabels: Record<MintStep, string> = {
+  idle: "Ready",
+  metadata: "Preparing metadata",
+  mint: "Minting",
+  approve: "Approving transfer",
+  encrypt: "Encrypting reserve",
+  list: "Listing",
+  done: "Complete",
+};
 
 export function NFTMinter() {
   const { address, isConnected } = useAccount();
-  const { mint } = useNFT();
-  const { encryptMetadata, encrypting } = useCoFHE();
-  const writeContract = useWriteContract();
+  const publicClient = usePublicClient({ chainId: APP_CHAIN_ID });
+  const { writeContractAsync } = useWriteContract();
+  const { encryptUint64, encrypting, status } = useCoFHE();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [privateNotes, setPrivateNotes] = useState("");
   const [price, setPrice] = useState("");
-  const [attributes, setAttributes] = useState<{ trait_type: string; value: string }[]>([
-    { trait_type: "", value: "" },
-  ]);
+  const [royaltyBps, setRoyaltyBps] = useState("500");
+  const [autoList, setAutoList] = useState(true);
+  const [attrs, setAttrs] = useState<NftAttribute[]>([{ trait_type: "Edition", value: "Genesis" }]);
+  const [step, setStep] = useState<MintStep>("idle");
+  const [submitting, setSubmitting] = useState(false);
+  const [lastTokenId, setLastTokenId] = useState<bigint | null>(null);
 
-  const addAttribute = () => {
-    setAttributes([...attributes, { trait_type: "", value: "" }]);
-  };
+  const priceWei = useMemo(() => {
+    try {
+      return price ? parseEther(price) : 0n;
+    } catch {
+      return -1n;
+    }
+  }, [price]);
 
-  const removeAttribute = (index: number) => {
-    setAttributes(attributes.filter((_, i) => i !== index));
-  };
-
-  const updateAttribute = (index: number, field: "trait_type" | "value", value: string) => {
-    const updated = [...attributes];
-    updated[index][field] = value;
-    setAttributes(updated);
+  const addAttr = () => setAttrs((current) => [...current, { trait_type: "", value: "" }]);
+  const removeAttr = (index: number) => setAttrs((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  const updateAttr = (index: number, field: keyof NftAttribute, value: string) => {
+    setAttrs((current) => current.map((attr, currentIndex) => (currentIndex === index ? { ...attr, [field]: value } : attr)));
   };
 
   const handleMint = async () => {
-    if (!name || !description || !imageUrl || !price) {
-      toast.error("Please fill in all fields");
+    if (!isConnected || !address) {
+      toast.error("Connect a wallet first.");
       return;
     }
 
-    const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum <= 0) {
-      toast.error("Please enter a valid price");
+    if (!hasContractConfig) {
+      toast.error("Contract addresses are missing.");
       return;
     }
 
-    const metadata = {
-      name,
-      description,
-      image: imageUrl,
-      price: price,
-      attributes: Object.fromEntries(
-        attributes.filter((a) => a.trait_type && a.value).map((a) => [a.trait_type, a.value])
-      ),
-    };
+    if (!publicClient) {
+      toast.error("Sepolia RPC client is not ready.");
+      return;
+    }
 
-    const encrypted = await encryptMetadata(metadata);
+    if (!name.trim() || !description.trim() || !imageUrl.trim() || !price.trim()) {
+      toast.error("Fill in the required mint fields.");
+      return;
+    }
 
-    const uri = `data:application/json,${encodeURIComponent(JSON.stringify({
-      ...metadata,
-      encrypted: !!encrypted,
-    }))}`;
+    if (priceWei <= 0n) {
+      toast.error("Enter a valid reserve price.");
+      return;
+    }
 
-    if (address && process.env.NEXT_PUBLIC_NFT_ADDRESS) {
-      writeContract.writeContract({
-        address: process.env.NEXT_PUBLIC_NFT_ADDRESS as `0x${string}`,
-        abi: NFT_ABI,
-        functionName: "mint",
-        args: [address, uri],
+    if (priceWei > MAX_ENCRYPTED_WEI) {
+      toast.error("Encrypted uint64 prices support up to about 18.44 ETH.");
+      return;
+    }
+
+    const royalty = Number.parseInt(royaltyBps, 10);
+    if (!Number.isFinite(royalty) || royalty < 0 || royalty > 1000) {
+      toast.error("Royalty must be between 0 and 1000 basis points.");
+      return;
+    }
+
+    setSubmitting(true);
+    setStep("metadata");
+
+    try {
+      const { metadata } = await buildTokenMetadata({
+        name: name.trim(),
+        description: description.trim(),
+        image: imageUrl.trim(),
+        attributes: attrs,
+        privateNotes,
       });
+      const uri = await uploadMetadata(metadata);
+
+      const nextTokenId = (await publicClient.readContract({
+        address: NFT_ADDRESS,
+        abi: NFT_ABI,
+        functionName: "nextTokenId",
+      })) as bigint;
+
+      setStep("mint");
+      const mintHash = await writeContractAsync({
+        address: NFT_ADDRESS,
+        abi: NFT_ABI,
+        functionName: "mintWithRoyalty",
+        args: [address, uri, address, BigInt(royalty)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: mintHash });
+      setLastTokenId(nextTokenId);
+
+      if (autoList) {
+        setStep("approve");
+        const approveHash = await writeContractAsync({
+          address: NFT_ADDRESS,
+          abi: NFT_ABI,
+          functionName: "approve",
+          args: [MARKETPLACE_ADDRESS, nextTokenId],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+        setStep("encrypt");
+        const encryptedReserve = await encryptUint64(priceWei);
+        const contractReserve = { ...encryptedReserve, signature: encryptedReserve.signature as `0x${string}` };
+
+        setStep("list");
+        const listHash = await writeContractAsync({
+          address: MARKETPLACE_ADDRESS,
+          abi: MARKETPLACE_ABI,
+          functionName: "listNFT",
+          args: [nextTokenId, contractReserve],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: listHash });
+      }
+
+      setStep("done");
+      toast.success(autoList ? "NFT minted and listed with an encrypted reserve." : "NFT minted.");
+      setName("");
+      setDescription("");
+      setImageUrl("");
+      setPrivateNotes("");
+      setPrice("");
+      setAttrs([{ trait_type: "Edition", value: "Genesis" }]);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Mint flow failed.");
+      setStep("idle");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash: mint.data,
-  });
-
   if (!isConnected) {
     return (
-      <div className="glass rounded-2xl p-12 text-center">
-        <div className="text-5xl mb-4">🔐</div>
-        <h3 className="text-xl font-bold text-white mb-2 font-['Syne']">Connect Your Wallet</h3>
-        <p className="text-slate-400">Connect your wallet to mint encrypted NFTs</p>
+      <div className="panel px-6 py-12 text-center">
+        <h3 className="text-3xl text-[rgb(var(--ink))]">Connect a wallet to mint.</h3>
+        <p className="mx-auto mt-3 max-w-lg text-base leading-7 text-[rgb(var(--muted))]">
+          The creator flow signs metadata, mints the NFT, encrypts the reserve, and lists it on Sepolia.
+        </p>
+        <div className="mt-6 flex justify-center">
+          <ConnectButton showBalance={false} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="glass rounded-2xl p-8 max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center">
-          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-white font-['Syne']">Mint Encrypted NFT</h2>
-          <p className="text-slate-400 text-sm">Your metadata will be encrypted on-chain</p>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">NFT Name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Cosmic Voyager #42"
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition-colors"
-          />
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="panel p-5 sm:p-6">
+        <div className="mb-6 flex flex-col gap-3 border-b border-[rgb(var(--line))] pb-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <span className="eyebrow">Creator studio</span>
+            <h2 className="mt-4 text-3xl text-[rgb(var(--ink))]">Mint and list in one transaction flow</h2>
+          </div>
+          <span className="status-pill">{stepLabels[step]}</span>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="A rare collectible from the encrypted metaverse..."
-            rows={3}
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
-          />
-        </div>
+        <div className="grid gap-5">
+          <div>
+            <label className="field-label">NFT name</label>
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Silent Atlas #42" className="field" />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Image URL</label>
-          <input
-            type="url"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://example.com/nft-image.png"
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition-colors"
-          />
-          <p className="text-xs text-slate-500 mt-1">Supports IPFS, Arweave, or any public URL</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Listing Price (ETH)</label>
-          <div className="relative">
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.1"
-              step="0.001"
-              min="0"
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition-colors pr-16"
+          <div>
+            <label className="field-label">Public description</label>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="A private collectible with sealed market data."
+              rows={4}
+              className="field resize-none"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">ETH</span>
           </div>
-          <p className="text-xs text-cyan-400 mt-1 flex items-center gap-1">
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Price will be encrypted with FHE
-          </p>
-        </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-slate-300">Attributes (Optional)</label>
-            <button
-              onClick={addAttribute}
-              className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
-            >
-              + Add Attribute
-            </button>
-          </div>
-          <div className="space-y-2">
-            {attributes.map((attr, index) => (
-              <div key={index} className="flex gap-2">
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="field-label">Image URL</label>
+              <input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." className="field" />
+            </div>
+            <div>
+              <label className="field-label">Encrypted reserve</label>
+              <div className="relative">
                 <input
-                  type="text"
-                  value={attr.trait_type}
-                  onChange={(e) => updateAttribute(index, "trait_type", e.target.value)}
-                  placeholder="Trait type"
-                  className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500/50"
+                  type="number"
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  placeholder="0.15"
+                  step="0.001"
+                  min="0"
+                  className="field pr-16"
                 />
-                <input
-                  type="text"
-                  value={attr.value}
-                  onChange={(e) => updateAttribute(index, "value", e.target.value)}
-                  placeholder="Value"
-                  className="flex-1 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500/50"
-                />
-                {attributes.length > 1 && (
-                  <button
-                    onClick={() => removeAttribute(index)}
-                    className="px-2 text-slate-400 hover:text-red-400 transition-colors"
-                  >
-                    ×
-                  </button>
-                )}
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[rgb(var(--muted))]">ETH</span>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
 
-        <div className="pt-4">
-          <button
-            onClick={handleMint}
-            disabled={mint.isPending || encrypting || isConfirming}
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all flex items-center justify-center gap-2"
-          >
-            {(mint.isPending || encrypting || isConfirming) ? (
-              <>
-                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                {encrypting ? "Encrypting Metadata..." : isConfirming ? "Confirming..." : "Minting..."}
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Mint Encrypted NFT
-              </>
-            )}
+          <div className="grid gap-5 md:grid-cols-[1fr_180px]">
+            <div>
+              <label className="field-label">Private note commitment</label>
+              <input
+                value={privateNotes}
+                onChange={(event) => setPrivateNotes(event.target.value)}
+                placeholder="Unlockable note, access code, or provenance detail"
+                className="field"
+              />
+            </div>
+            <div>
+              <label className="field-label">Royalty bps</label>
+              <input
+                type="number"
+                value={royaltyBps}
+                onChange={(event) => setRoyaltyBps(event.target.value)}
+                min="0"
+                max="1000"
+                step="25"
+                className="field"
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-[rgb(var(--line))] pt-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-2xl text-[rgb(var(--ink))]">Attributes</h3>
+              <button type="button" onClick={addAttr} className="btn-secondary min-h-0 px-3 py-2 text-sm">
+                Add trait
+              </button>
+            </div>
+
+            <div className="grid gap-3">
+              {attrs.map((attr, index) => (
+                <div key={index} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                  <input value={attr.trait_type} onChange={(event) => updateAttr(index, "trait_type", event.target.value)} placeholder="Trait" className="field" />
+                  <input value={attr.value} onChange={(event) => updateAttr(index, "value", event.target.value)} placeholder="Value" className="field" />
+                  <button type="button" onClick={() => removeAttr(index)} className="btn-secondary min-h-0 px-3 py-2 text-sm">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-3 border-t border-[rgb(var(--line))] pt-5 text-sm font-bold text-[rgb(var(--ink))]">
+            <input type="checkbox" checked={autoList} onChange={(event) => setAutoList(event.target.checked)} className="h-4 w-4 accent-[rgb(var(--teal))]" />
+            List on marketplace after mint
+          </label>
+
+          <button onClick={handleMint} disabled={submitting || encrypting} className="btn-primary w-full disabled:translate-y-0 disabled:opacity-55">
+            {submitting || encrypting ? stepLabels[step] : "Mint encrypted listing"}
           </button>
         </div>
-
-        {isSuccess && (
-          <div className="mt-4 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-            <p className="text-green-400 text-sm flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              NFT Minted Successfully! Check the Marketplace.
-            </p>
-          </div>
-        )}
       </div>
+
+      <aside className="space-y-4">
+        <div className="panel privacy-band p-5">
+          <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--teal))]">Live flow</p>
+          <div className="mt-4 space-y-3 text-sm font-semibold text-[rgb(var(--muted))]">
+            <p>Token: {lastTokenId ? `#${lastTokenId.toString()}` : "pending"}</p>
+            <p>Reserve: {priceWei > 0n ? `${price} ETH` : "not set"}</p>
+            <p>Storage: API route with IPFS fallback support</p>
+          </div>
+        </div>
+
+        <div className="panel p-5">
+          <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--teal))]">CoFHE status</p>
+          <p className="mt-3 text-2xl text-[rgb(var(--ink))]">{status?.label || stepLabels[step]}</p>
+          <p className="mt-2 text-sm leading-6 text-[rgb(var(--muted))]">
+            {status?.detail || "The reserve price is encrypted in the browser before the marketplace transaction."}
+          </p>
+        </div>
+      </aside>
     </div>
   );
 }

@@ -2,83 +2,66 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
+
+const navLinks = [
+  { href: "/", label: "Overview" },
+  { href: "/marketplace", label: "Marketplace" },
+  { href: "/create", label: "Mint" },
+  { href: "/about", label: "Protocol" },
+];
 
 export function Navigation() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const pathname = usePathname();
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? "glass-strong py-3" : "py-5"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center animate-pulse-glow">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold gradient-text font-['Syne']">StealthNFT</span>
+    <nav className="fixed inset-x-0 top-0 z-50 border-b border-[rgb(var(--line))] bg-[rgb(var(--paper)/0.9)] px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--teal))] font-[family-name:var(--font-display)] text-xl text-[rgb(var(--paper))]">
+              S
+            </span>
+            <span>
+              <span className="block font-[family-name:var(--font-display)] text-2xl leading-none text-[rgb(var(--ink))]">
+                StealthNFT
+              </span>
+              <span className="mt-1 block text-xs font-bold uppercase tracking-[0.08em] text-[rgb(var(--muted))]">
+                Confidential marketplace
+              </span>
+            </span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/marketplace" className="text-slate-300 hover:text-white transition-colors">
-              Marketplace
-            </Link>
-            <Link href="/create" className="text-slate-300 hover:text-white transition-colors">
-              Create
-            </Link>
-            <Link href="/about" className="text-slate-300 hover:text-white transition-colors">
-              About FHE
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <ConnectButton
-              showBalance={false}
-              chainStatus="icon"
-              accountStatus="address"
-            />
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-slate-300 hover:text-white"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
+          <div className="lg:hidden">
+            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
           </div>
         </div>
 
-        {mobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-white/5 pt-4">
-            <div className="flex flex-col gap-4">
-              <Link href="/marketplace" className="text-slate-300 hover:text-white transition-colors py-2">
-                Marketplace
-              </Link>
-              <Link href="/create" className="text-slate-300 hover:text-white transition-colors py-2">
-                Create
-              </Link>
-              <Link href="/about" className="text-slate-300 hover:text-white transition-colors py-2">
-                About FHE
-              </Link>
-            </div>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="flex flex-wrap gap-2">
+            {navLinks.map((link) => {
+              const active = pathname === link.href;
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`rounded-lg px-3 py-2 text-sm font-extrabold transition-colors ${
+                    active
+                      ? "bg-[rgb(var(--teal))] text-[rgb(var(--paper))]"
+                      : "text-[rgb(var(--muted))] hover:bg-[rgb(var(--surface))] hover:text-[rgb(var(--ink))]"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
-        )}
+
+          <div className="hidden lg:block">
+            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
+          </div>
+        </div>
       </div>
     </nav>
   );

@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({ subsets: ["latin"] });
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-body",
+});
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+});
 
 export const metadata: Metadata = {
-  title: "StealthNFT - Privacy-First NFT Marketplace",
-  description: "Build on Fhenix with Fully Homomorphic Encryption for confidential NFT transactions",
+  title: "StealthNFT | Private NFT Marketplace",
+  description: "A polished privacy-first NFT marketplace for encrypted minting, sealed offers, and selective disclosure.",
 };
 
 export default function RootLayout({
@@ -17,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${manrope.variable} ${fraunces.variable}`}>
         <Providers>{children}</Providers>
       </body>
     </html>

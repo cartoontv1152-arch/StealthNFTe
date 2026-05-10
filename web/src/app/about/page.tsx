@@ -1,167 +1,87 @@
-"use client";
+import Link from "next/link";
+import { PageShell } from "@/components/PageShell";
 
-import { Navigation } from "@/components/Navigation";
+const operations = [
+  { name: "FHE.asEuint64", body: "Converts signed encrypted SDK input into an encrypted reserve or offer handle." },
+  { name: "FHE.gte", body: "Compares a sealed offer against the current encrypted winning offer." },
+  { name: "FHE.select", body: "Updates the encrypted winner without revealing the losing path." },
+  { name: "FHE.allowPublic", body: "Makes only the final winner and winning amount eligible for threshold decryption." },
+  { name: "FHE.publishDecryptResult", body: "Verifies threshold signatures during buyer-paid settlement." },
+];
+
+const flow = [
+  "Creator mints an ERC-721 with royalty data and privacy commitment metadata.",
+  "Creator approves the marketplace and lists with an encrypted uint64 reserve.",
+  "Collectors submit encrypted offers from the browser CoFHE SDK.",
+  "Seller prepares the winning reveal after sealed offers arrive.",
+  "Winning buyer finalizes with decryptForTx proofs and ETH payment.",
+];
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen pt-24 pb-16 relative">
-      <Navigation />
-
-      <div className="fixed inset-0 pointer-events-none z-[1]">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl"></div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 relative z-10">
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 font-['Syne']">
-            About <span className="gradient-text">FHE</span>
+    <PageShell>
+      <section className="grid gap-6 pb-8 pt-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+        <div>
+          <span className="eyebrow">Protocol</span>
+          <h1 className="section-title mt-5 max-w-4xl text-[rgb(var(--ink))]">
+            The marketplace keeps bidding private until settlement needs a verifiable answer.
           </h1>
-          <p className="text-slate-400 max-w-2xl mx-auto text-lg">
-            Fully Homomorphic Encryption enables computation on encrypted data.
-            No decryption needed. Complete privacy.
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-[rgb(var(--muted))]">
+            StealthNFT follows the current Fhenix pattern: encrypted inputs, ACL-managed handles, public reveal permission, off-chain threshold decryption, and on-chain proof verification.
           </p>
         </div>
 
-        <div className="glass rounded-3xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6 font-['Syne']">What is FHE?</h2>
-          <p className="text-slate-300 leading-relaxed mb-6">
-            Fully Homomorphic Encryption (FHE) is a form of encryption that allows computations to be performed
-            on encrypted data without first decrypting it. This means you can process sensitive information
-            while it remains encrypted throughout the entire computation.
-          </p>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="glass rounded-xl p-5">
-              <div className="text-2xl mb-3">🔒</div>
-              <h3 className="font-bold text-white mb-2">Privacy by Default</h3>
-              <p className="text-slate-400 text-sm">Data stays encrypted during all computations</p>
-            </div>
-            <div className="glass rounded-xl p-5">
-              <div className="text-2xl mb-3">⚡</div>
-              <h3 className="font-bold text-white mb-2">On-Chain Compute</h3>
-              <p className="text-slate-400 text-sm">Smart contracts can process encrypted state</p>
-            </div>
-            <div className="glass rounded-xl p-5">
-              <div className="text-2xl mb-3">🔐</div>
-              <h3 className="font-bold text-white mb-2">Selective Disclosure</h3>
-              <p className="text-slate-400 text-sm">Owners choose when to reveal encrypted data</p>
-            </div>
-            <div className="glass rounded-xl p-5">
-              <div className="text-2xl mb-3">🛡️</div>
-              <h3 className="font-bold text-white mb-2">Verifiable Security</h3>
-              <p className="text-slate-400 text-sm">Decentralized guarantees for confidentiality</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass rounded-3xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6 font-['Syne']">How StealthNFT Uses FHE</h2>
-
-          <div className="space-y-6">
-            <div className="flex gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold">1</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-2">Encrypted Prices</h3>
-                <p className="text-slate-400 text-sm">
-                  When you list an NFT, the price is encrypted client-side using FHE. The smart contract
-                  stores the encrypted price and can compare it with offers without ever decrypting it.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-pink-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold">2</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-2">Sealed Bids</h3>
-                <p className="text-slate-400 text-sm">
-                  Buyers submit encrypted offers. The contract uses FHE operations like <code className="text-purple-400">FHE.gte()</code> to
-                  compare offers against the encrypted price. The highest qualifying bid wins, all without decryption.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-green-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold">3</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-2">Private Metadata</h3>
-                <p className="text-slate-400 text-sm">
-                  NFT metadata including name, description, and attributes can be encrypted. Only the owner
-                  can reveal specific metadata when they choose to.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-purple-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold">4</span>
-              </div>
-              <div>
-                <h3 className="font-bold text-white mb-2">Settlement with Proof</h3>
-                <p className="text-slate-400 text-sm">
-                  When a seller accepts a bid, they authorize decryption of the winning buyer&apos;s address.
-                  This generates a proof that is verified on-chain for secure settlement.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="glass rounded-3xl p-8 mb-8">
-          <h2 className="text-2xl font-bold text-white mb-6 font-['Syne']">FHE Operations Used</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-black/30 rounded-xl p-4">
-              <code className="text-purple-400 text-sm">FHE.asEuint64()</code>
-              <p className="text-slate-400 text-xs mt-2">Convert plaintext to encrypted uint64</p>
-            </div>
-            <div className="bg-black/30 rounded-xl p-4">
-              <code className="text-cyan-400 text-sm">FHE.gte(a, b)</code>
-              <p className="text-slate-400 text-xs mt-2">Compare two encrypted values</p>
-            </div>
-            <div className="bg-black/30 rounded-xl p-4">
-              <code className="text-pink-400 text-sm">FHE.select(cond, a, b)</code>
-              <p className="text-slate-400 text-xs mt-2">Select based on encrypted condition</p>
-            </div>
-            <div className="bg-black/30 rounded-xl p-4">
-              <code className="text-green-400 text-sm">FHE.allowPublic()</code>
-              <p className="text-slate-400 text-xs mt-2">Authorize decryption for settlement</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="text-center">
-          <h3 className="text-xl font-bold text-white mb-4 font-['Syne']">Ready to Build?</h3>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a
-              href="https://docs.fhenix.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-semibold hover:opacity-90 transition-opacity flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              Fhenix Documentation
+        <div className="panel privacy-band p-5">
+          <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--teal))]">Docs used</p>
+          <div className="mt-4 grid gap-3">
+            <a className="btn-secondary" href="https://cofhe-docs.fhenix.zone/client-sdk/introduction/overview" target="_blank" rel="noreferrer">
+              Client SDK
             </a>
-            <a
-              href="https://github.com/FhenixProtocol/awesome-fhenix"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 rounded-xl glass text-slate-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-              </svg>
-              Explore Examples
+            <a className="btn-secondary" href="https://cofhe-docs.fhenix.zone/fhe-library/examples/auction-example" target="_blank" rel="noreferrer">
+              Auction pattern
             </a>
           </div>
         </div>
-      </div>
-    </main>
+      </section>
+
+      <section className="grid gap-5 py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div>
+          <span className="eyebrow">Settlement flow</span>
+          <h2 className="mt-5 text-4xl text-[rgb(var(--ink))]">Five on-chain states, one buyer-visible action path.</h2>
+        </div>
+
+        <div className="panel p-5">
+          <ol className="grid gap-3">
+            {flow.map((item, index) => (
+              <li key={item} className="grid gap-3 border-b border-[rgb(var(--line))] pb-3 last:border-b-0 last:pb-0 sm:grid-cols-[56px_minmax(0,1fr)]">
+                <span className="font-[family-name:var(--font-display)] text-3xl text-[rgb(var(--teal))]">{String(index + 1).padStart(2, "0")}</span>
+                <span className="text-base leading-7 text-[rgb(var(--muted))]">{item}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="py-8">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <span className="eyebrow">FHE calls</span>
+            <h2 className="mt-5 text-4xl text-[rgb(var(--ink))]">Operations used by the contracts</h2>
+          </div>
+          <Link href="/marketplace" className="btn-primary">
+            Open marketplace
+          </Link>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {operations.map((operation) => (
+            <article key={operation.name} className="panel p-5">
+              <code className="text-sm font-extrabold text-[rgb(var(--teal))]">{operation.name}</code>
+              <p className="mt-3 text-sm leading-6 text-[rgb(var(--muted))]">{operation.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </PageShell>
   );
 }
