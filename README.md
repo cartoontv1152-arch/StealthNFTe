@@ -1,6 +1,6 @@
 # StealthNFT
 
-**Wave 3/4 complete production build for a privacy-first NFT marketplace on Fhenix/coFHE.**
+** complete production build for a privacy-first NFT marketplace on Fhenix/coFHE.**
 
 StealthNFT lets creators mint NFTs, list them with encrypted reserve prices, receive sealed offers, and settle the winning sale with threshold-network decrypt proofs. Public marketplace UX stays simple while the sensitive pricing and bidder path remains private until the seller prepares the final reveal.
 
