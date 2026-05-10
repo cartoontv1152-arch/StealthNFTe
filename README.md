@@ -23,6 +23,8 @@ StealthNFT lets creators mint NFTs, list them with encrypted reserve prices, rec
 - Buyer finalization with `decryptForTx(...).withoutPermit()` proofs.
 - On-chain verification with `FHE.publishDecryptResult`.
 - Payment enforcement against the decrypted winning offer.
+- Late bids are rejected after reveal preparation.
+- Seller recovery paths handle below-reserve no-sale reveals and expired buyer settlement windows.
 
 ## On-Chain Flow
 
@@ -33,6 +35,8 @@ StealthNFT lets creators mint NFTs, list them with encrypted reserve prices, rec
 5. Seller prepares reveal for the final buyer and offer handles.
 6. Winning buyer decrypts for transaction, submits threshold signatures, pays ETH, and receives the NFT.
 7. ERC-2981 royalty is paid before seller proceeds when a royalty receiver is configured.
+8. If no offer met reserve, the seller can prove the revealed buyer is zero and close the listing.
+9. If a winning buyer does not settle within two days, the seller can reclaim the NFT.
 
 ## Contracts
 
@@ -45,8 +49,8 @@ StealthNFT lets creators mint NFTs, list them with encrypted reserve prices, rec
 
 | Contract | Address |
 | --- | --- |
-| StealthNFT | `0xF6351513BcA3d8C6e676c45852B1DB17f9C38166` |
-| StealthMarketplace | `0x146199170f032954c8CcFB20C6E5827Ed9daB23f` |
+| StealthNFT | `0xFFDb695Db282b12E7b82790152971Cca52518d59` |
+| StealthMarketplace | `0x24895bee0dD2196C3b3154A082d7eB58236771B4` |
 
 Deployment metadata is stored in `contracts/deployments/sepolia.json`.
 
@@ -59,7 +63,7 @@ Deployment metadata is stored in `contracts/deployments/sepolia.json`.
 - `web/src/components/NFTMinter.tsx`
   Mint, approve, encrypt reserve, and list flow.
 - `web/src/components/NFTGrid.tsx`
-  Place sealed offers, seller reveal, cancel, and buyer finalize actions.
+  Place sealed offers, seller reveal, no-sale close, expired reveal reclaim, cancel, and buyer finalize actions.
 - `web/src/app/api/metadata/route.ts`
   Metadata pinning route with `PINATA_JWT` support and safe fallback.
 

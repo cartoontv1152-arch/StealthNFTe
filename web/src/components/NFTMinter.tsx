@@ -170,11 +170,8 @@ export function NFTMinter() {
 
   if (!isConnected) {
     return (
-      <div className="panel px-6 py-12 text-center">
-        <h3 className="text-3xl text-[rgb(var(--ink))]">Connect a wallet to mint.</h3>
-        <p className="mx-auto mt-3 max-w-lg text-base leading-7 text-[rgb(var(--muted))]">
-          The creator flow signs metadata, mints the NFT, encrypts the reserve, and lists it on Sepolia.
-        </p>
+      <div className="border-y border-[rgb(var(--line))] px-2 py-16 text-center">
+        <h3 className="text-4xl text-[rgb(var(--ink))]">Connect wallet</h3>
         <div className="mt-6 flex justify-center">
           <ConnectButton showBalance={false} />
         </div>
@@ -183,13 +180,10 @@ export function NFTMinter() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="panel p-5 sm:p-6">
-        <div className="mb-6 flex flex-col gap-3 border-b border-[rgb(var(--line))] pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <span className="eyebrow">Creator studio</span>
-            <h2 className="mt-4 text-3xl text-[rgb(var(--ink))]">Mint and list in one transaction flow</h2>
-          </div>
+    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="border-y border-[rgb(var(--line))] py-6">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h2 className="text-3xl text-[rgb(var(--ink))]">Details</h2>
           <span className="status-pill">{stepLabels[step]}</span>
         </div>
 
@@ -200,7 +194,7 @@ export function NFTMinter() {
           </div>
 
           <div>
-            <label className="field-label">Public description</label>
+            <label className="field-label">Description</label>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
@@ -216,7 +210,7 @@ export function NFTMinter() {
               <input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." className="field" />
             </div>
             <div>
-              <label className="field-label">Encrypted reserve</label>
+              <label className="field-label">Reserve</label>
               <div className="relative">
                 <input
                   type="number"
@@ -234,11 +228,11 @@ export function NFTMinter() {
 
           <div className="grid gap-5 md:grid-cols-[1fr_180px]">
             <div>
-              <label className="field-label">Private note commitment</label>
+              <label className="field-label">Private note</label>
               <input
                 value={privateNotes}
                 onChange={(event) => setPrivateNotes(event.target.value)}
-                placeholder="Unlockable note, access code, or provenance detail"
+                placeholder="Optional"
                 className="field"
               />
             </div>
@@ -258,9 +252,9 @@ export function NFTMinter() {
 
           <div className="border-t border-[rgb(var(--line))] pt-5">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-2xl text-[rgb(var(--ink))]">Attributes</h3>
+              <h3 className="text-2xl text-[rgb(var(--ink))]">Traits</h3>
               <button type="button" onClick={addAttr} className="btn-secondary min-h-0 px-3 py-2 text-sm">
-                Add trait
+                Add
               </button>
             </div>
 
@@ -279,32 +273,21 @@ export function NFTMinter() {
 
           <label className="flex items-center gap-3 border-t border-[rgb(var(--line))] pt-5 text-sm font-bold text-[rgb(var(--ink))]">
             <input type="checkbox" checked={autoList} onChange={(event) => setAutoList(event.target.checked)} className="h-4 w-4 accent-[rgb(var(--teal))]" />
-            List on marketplace after mint
+            List after mint
           </label>
-
-          <button onClick={handleMint} disabled={submitting || encrypting} className="btn-primary w-full disabled:translate-y-0 disabled:opacity-55">
-            {submitting || encrypting ? stepLabels[step] : "Mint encrypted listing"}
-          </button>
         </div>
       </div>
 
-      <aside className="space-y-4">
-        <div className="panel privacy-band p-5">
-          <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--teal))]">Live flow</p>
-          <div className="mt-4 space-y-3 text-sm font-semibold text-[rgb(var(--muted))]">
-            <p>Token: {lastTokenId ? `#${lastTokenId.toString()}` : "pending"}</p>
-            <p>Reserve: {priceWei > 0n ? `${price} ETH` : "not set"}</p>
-            <p>Storage: API route with IPFS fallback support</p>
-          </div>
+      <aside className="border-y border-[rgb(var(--line))] py-6 lg:sticky lg:top-28 lg:self-start">
+        <div className="space-y-4 text-sm font-semibold text-[rgb(var(--muted))]">
+          <p>Status: <span className="text-[rgb(var(--ink))]">{status?.label || stepLabels[step]}</span></p>
+          <p>Token: <span className="text-[rgb(var(--ink))]">{lastTokenId ? `#${lastTokenId.toString()}` : "pending"}</span></p>
+          <p>Reserve: <span className="text-[rgb(var(--ink))]">{priceWei > 0n ? `${price} ETH` : "not set"}</span></p>
         </div>
 
-        <div className="panel p-5">
-          <p className="text-sm font-extrabold uppercase tracking-[0.08em] text-[rgb(var(--teal))]">CoFHE status</p>
-          <p className="mt-3 text-2xl text-[rgb(var(--ink))]">{status?.label || stepLabels[step]}</p>
-          <p className="mt-2 text-sm leading-6 text-[rgb(var(--muted))]">
-            {status?.detail || "The reserve price is encrypted in the browser before the marketplace transaction."}
-          </p>
-        </div>
+        <button onClick={handleMint} disabled={submitting || encrypting} className="btn-primary mt-6 w-full disabled:translate-y-0 disabled:opacity-55">
+          {submitting || encrypting ? stepLabels[step] : "Mint"}
+        </button>
       </aside>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   MARKETPLACE_ADDRESS,
   NFT_ABI,
   NFT_ADDRESS,
+  SETTLEMENT_GRACE_PERIOD_SECONDS,
   getPublicClient,
   hasContractConfig,
 } from "@/lib/contracts";
@@ -30,6 +31,9 @@ export interface MarketplaceNFT {
   listingActive: boolean;
   bidReceived: boolean;
   revealPrepared: boolean;
+  revealPreparedAt: bigint;
+  settlementDeadline: bigint;
+  settlementExpired: boolean;
   bidCount: number;
   reserveHandle: Hex;
   highestOfferHandle: Hex;
@@ -45,6 +49,7 @@ type ListingCore = {
   active: boolean;
   bidReceived: boolean;
   revealPrepared: boolean;
+  revealPreparedAt: bigint;
   bidCount: number;
   revealedPrice: bigint;
   revealedBuyer: Address;
@@ -93,7 +98,11 @@ export function useStealthMarketplace() {
   }, [publicClient]);
 
   useEffect(() => {
-    void refresh();
+    const timeoutId = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [refresh]);
 
   return {
@@ -123,6 +132,8 @@ async function loadToken(publicClient: PublicClient, tokenId: bigint): Promise<M
     const core = await readListingCore(publicClient, tokenId);
     const handles = await readSettlementHandles(publicClient, tokenId, core);
     const revealedPrice = core.revealedPrice;
+    const settlementDeadline =
+      core.revealPreparedAt > 0n ? core.revealPreparedAt + BigInt(SETTLEMENT_GRACE_PERIOD_SECONDS) : 0n;
 
     return {
       tokenId: Number(tokenId),
@@ -137,6 +148,9 @@ async function loadToken(publicClient: PublicClient, tokenId: bigint): Promise<M
       listingActive: core.active,
       bidReceived: core.bidReceived,
       revealPrepared: core.revealPrepared,
+      revealPreparedAt: core.revealPreparedAt,
+      settlementDeadline,
+      settlementExpired: core.revealPrepared && settlementDeadline > 0n && BigInt(Math.floor(Date.now() / 1000)) > settlementDeadline,
       bidCount: core.bidCount,
       reserveHandle: core.reserveHandle,
       highestOfferHandle: handles.highestOfferHandle,
@@ -158,7 +172,7 @@ async function readListingCore(publicClient: PublicClient, tokenId: bigint): Pro
       abi: MARKETPLACE_ABI,
       functionName: "getListingCore",
       args: [tokenId],
-    })) as readonly [Address, Hex, boolean, boolean, boolean, number, bigint, Address];
+    })) as readonly [Address, Hex, boolean, boolean, boolean, bigint, number, bigint, Address];
 
     return {
       seller: core[0],
@@ -166,9 +180,10 @@ async function readListingCore(publicClient: PublicClient, tokenId: bigint): Pro
       active: core[2],
       bidReceived: core[3],
       revealPrepared: core[4],
-      bidCount: Number(core[5]),
-      revealedPrice: BigInt(core[6]),
-      revealedBuyer: core[7],
+      revealPreparedAt: BigInt(core[5]),
+      bidCount: Number(core[6]),
+      revealedPrice: BigInt(core[7]),
+      revealedBuyer: core[8],
     };
   } catch {
     const legacy = (await publicClient.readContract({
@@ -184,6 +199,7 @@ async function readListingCore(publicClient: PublicClient, tokenId: bigint): Pro
       active: legacy[2],
       bidReceived: legacy[3],
       revealPrepared: false,
+      revealPreparedAt: 0n,
       bidCount: legacy[3] ? 1 : 0,
       revealedPrice: 0n,
       revealedBuyer: "0x0000000000000000000000000000000000000000",

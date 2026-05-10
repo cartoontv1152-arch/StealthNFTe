@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --paper: 247 250 248;
-  --ink: 24 32 37;
-  --muted: 86 101 110;
-  --teal: 49 95 109;
-  --sage: 79 128 105;
-  --coral: 203 92 79;
-  --gold: 225 174 84;
-  --line: 216 226 221;
+  --paper: 250 250 247;
+  --ink: 18 22 24;
+  --muted: 103 111 111;
+  --teal: 20 113 99;
+  --sage: 78 132 102;
+  --coral: 202 90 69;
+  --gold: 219 158 72;
+  --line: 224 226 220;
   --surface: 255 255 255;
 
   /* Compatibility aliases for existing Tailwind arbitrary values. */
@@ -28,9 +28,7 @@ html {
 
 body {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgb(var(--paper)) 0%, rgb(238 244 241) 100%),
-    rgb(var(--paper));
+  background: rgb(var(--paper));
   color: rgb(var(--ink));
   font-family: var(--font-body), sans-serif;
 }
@@ -101,33 +99,37 @@ img {
 }
 
 @layer components {
+  .page-wrap {
+    width: min(1120px, calc(100% - 48px));
+    margin-inline: auto;
+  }
+
+  @media (max-width: 640px) {
+    .page-wrap {
+      width: min(100% - 32px, 1120px);
+    }
+  }
+
   .soft-panel,
   .panel {
     border: 1px solid rgb(var(--line));
     border-radius: 8px;
-    background: rgb(var(--surface) / 0.88);
-    box-shadow: 0 18px 48px rgb(31 58 49 / 0.08);
+    background: rgb(var(--surface));
   }
 
   .section-title {
-    font-size: 3rem;
+    font-size: 2.9rem;
     line-height: 0.98;
   }
 
   @media (min-width: 768px) {
     .section-title {
-      font-size: 4.25rem;
+      font-size: 5.2rem;
     }
   }
 
   .eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
-    border: 1px solid rgb(var(--line));
-    border-radius: 999px;
-    background: rgb(var(--surface) / 0.88);
-    padding: 0.55rem 0.8rem;
+    display: inline-block;
     color: rgb(var(--teal));
     font-size: 0.74rem;
     font-weight: 800;
@@ -136,11 +138,7 @@ img {
   }
 
   .eyebrow::before {
-    content: "";
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 999px;
-    background: rgb(var(--coral));
+    content: none;
   }
 
   .btn-primary,
@@ -150,39 +148,38 @@ img {
     align-items: center;
     justify-content: center;
     gap: 0.55rem;
-    min-height: 2.75rem;
+    min-height: 2.65rem;
     border-radius: 8px;
-    padding: 0.78rem 1rem;
+    padding: 0.72rem 1rem;
     font-weight: 800;
+    font-size: 0.94rem;
     transition:
       transform 160ms ease,
       border-color 160ms ease,
-      background 160ms ease,
-      box-shadow 160ms ease;
+      background 160ms ease;
   }
 
   .btn-primary {
     border: 1px solid rgb(var(--teal));
     background: rgb(var(--teal));
-    color: rgb(var(--paper));
-    box-shadow: 0 12px 24px rgb(var(--teal) / 0.18);
+    color: rgb(var(--surface)) !important;
   }
 
   .btn-primary:hover {
     transform: translateY(-1px);
-    background: rgb(37 79 92);
+    background: rgb(11 91 80);
   }
 
   .btn-secondary {
     border: 1px solid rgb(var(--line));
-    background: rgb(var(--surface));
+    background: transparent;
     color: rgb(var(--ink));
   }
 
   .btn-secondary:hover {
     transform: translateY(-1px);
     border-color: rgb(var(--teal) / 0.35);
-    background: rgb(241 247 244);
+    background: rgb(var(--surface));
   }
 
   .btn-danger {
@@ -192,10 +189,8 @@ img {
   }
 
   .metric-card {
-    border: 1px solid rgb(var(--line));
-    border-radius: 8px;
-    background: rgb(var(--surface));
-    padding: 1rem;
+    border-top: 1px solid rgb(var(--line));
+    padding-top: 0.85rem;
   }
 
   .field-label {
@@ -212,7 +207,7 @@ img {
     border-radius: 8px;
     background: rgb(var(--surface));
     color: rgb(var(--ink));
-    padding: 0.84rem 0.9rem;
+    padding: 0.78rem 0.86rem;
     transition:
       border-color 160ms ease,
       box-shadow 160ms ease;
@@ -234,34 +229,23 @@ img {
     gap: 0.45rem;
     border: 1px solid rgb(var(--line));
     border-radius: 999px;
-    background: rgb(var(--surface));
-    padding: 0.38rem 0.65rem;
+    background: rgb(var(--paper));
+    padding: 0.34rem 0.62rem;
     color: rgb(var(--muted));
     font-size: 0.78rem;
     font-weight: 800;
   }
 
   .status-pill::before {
-    content: "";
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 999px;
-    background: rgb(var(--sage));
+    content: none;
   }
 
   .grid-pattern {
-    background-image:
-      linear-gradient(rgb(var(--teal) / 0.055) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--teal) / 0.055) 1px, transparent 1px);
-    background-size: 48px 48px;
-    mask-image: linear-gradient(180deg, rgb(0 0 0 / 0.8), transparent 92%);
+    background: transparent;
   }
 
   .privacy-band {
-    background:
-      linear-gradient(135deg, rgb(var(--teal) / 0.12), transparent 36%),
-      linear-gradient(225deg, rgb(var(--gold) / 0.16), transparent 38%),
-      rgb(var(--surface));
+    background: rgb(var(--surface));
   }
 
   .animate-reveal {

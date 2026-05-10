@@ -8,7 +8,7 @@ Next.js frontend for the Wave 3/4 StealthNFT marketplace.
 - Browser CoFHE SDK encryption for reserve prices and sealed offers.
 - Creator flow for metadata, minting, ERC-2981 royalty setup, approval, encrypted listing, and transaction progress.
 - Collector flow for sealed offers and buyer-side finalization with `decryptForTx` proofs.
-- Seller flow for reveal preparation and safe cancellation before bids.
+- Seller flow for reveal preparation, no-sale close, expired reveal reclaim, and safe cancellation before bids.
 - Metadata API route with optional Pinata/IPFS pinning and data URI fallback.
 
 ## Run

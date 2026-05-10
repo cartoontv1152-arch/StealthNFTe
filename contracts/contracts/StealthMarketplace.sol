@@ -13,6 +13,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 ///         Fhenix's allowPublic + decryptForTx + publishDecryptResult pattern.
 contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
     IERC721 public immutable nft;
+    uint64 public constant SETTLEMENT_GRACE_PERIOD = 2 days;
 
     struct Listing {
         address seller;
@@ -20,6 +21,7 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
         bool active;
         bool bidReceived;
         bool revealPrepared;
+        uint64 revealPreparedAt;
         uint32 bidCount;
         uint64 revealedPrice;
         address revealedBuyer;
@@ -43,6 +45,8 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
         uint256 royaltyAmount
     );
     event ListingCancelled(uint256 indexed tokenId, address indexed seller);
+    event NoSaleClosed(uint256 indexed tokenId, address indexed seller);
+    event ExpiredRevealReclaimed(uint256 indexed tokenId, address indexed seller);
     event PriceRevealPrepared(uint256 indexed tokenId, bytes32 reserveHandle);
 
     constructor(address _nft) {
@@ -66,6 +70,7 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
             active: true,
             bidReceived: false,
             revealPrepared: false,
+            revealPreparedAt: 0,
             bidCount: 0,
             revealedPrice: 0,
             revealedBuyer: address(0)
@@ -87,6 +92,7 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
         Listing storage li = listings[tokenId];
         require(li.active, "Stealth: not listed");
         require(msg.sender != li.seller, "Stealth: seller cannot bid");
+        require(!li.revealPrepared, "Stealth: reveal prepared");
 
         euint64 offer = FHE.asEuint64(encOffer);
         FHE.allowThis(offer);
@@ -119,11 +125,13 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
         require(li.active, "Stealth: not listed");
         require(msg.sender == li.seller, "Stealth: only seller");
         require(li.bidReceived, "Stealth: no bids");
+        require(!li.revealPrepared, "Stealth: already prepared");
 
         FHE.allowPublic(pendingBuyer[tokenId]);
         FHE.allowPublic(highestOffer[tokenId]);
 
         li.revealPrepared = true;
+        li.revealPreparedAt = uint64(block.timestamp);
         emit SalePrepared(tokenId, eaddress.unwrap(pendingBuyer[tokenId]), euint64.unwrap(highestOffer[tokenId]));
     }
 
@@ -208,6 +216,45 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
         }
     }
 
+    /// @notice Close a reveal where no encrypted offer met the reserve. The seller proves the
+    ///         revealed buyer handle is the zero address and receives the NFT back.
+    function closeNoSale(
+        uint256 tokenId,
+        address buyerPlain,
+        bytes calldata buyerSig
+    ) external nonReentrant {
+        Listing storage li = listings[tokenId];
+        require(li.active, "Stealth: inactive");
+        require(li.revealPrepared, "Stealth: reveal not prepared");
+        require(msg.sender == li.seller, "Stealth: only seller");
+
+        _verifyNoWinningBuyer(tokenId, buyerPlain, buyerSig);
+
+        address seller = li.seller;
+        li.active = false;
+        li.revealedBuyer = address(0);
+        nft.safeTransferFrom(address(this), seller, tokenId);
+        emit NoSaleClosed(tokenId, seller);
+    }
+
+    /// @notice If a revealed winning buyer does not settle, the seller can recover the NFT after
+    ///         the grace period. This prevents unescrowed sealed offers from locking inventory.
+    function reclaimExpiredReveal(uint256 tokenId) external nonReentrant {
+        Listing storage li = listings[tokenId];
+        require(li.active, "Stealth: inactive");
+        require(li.revealPrepared, "Stealth: reveal not prepared");
+        require(msg.sender == li.seller, "Stealth: only seller");
+        require(
+            block.timestamp > uint256(li.revealPreparedAt) + SETTLEMENT_GRACE_PERIOD,
+            "Stealth: grace active"
+        );
+
+        address seller = li.seller;
+        li.active = false;
+        nft.safeTransferFrom(address(this), seller, tokenId);
+        emit ExpiredRevealReclaimed(tokenId, seller);
+    }
+
     /// @notice Cancel before any purchase attempt (plaintext guard).
     function cancelListing(uint256 tokenId) external {
         Listing storage li = listings[tokenId];
@@ -229,6 +276,7 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
             bool active,
             bool bidReceived,
             bool revealPrepared,
+            uint64 revealPreparedAt,
             uint32 bidCount,
             uint64 revealedPrice,
             address revealedBuyer
@@ -241,6 +289,7 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
             li.active,
             li.bidReceived,
             li.revealPrepared,
+            li.revealPreparedAt,
             li.bidCount,
             li.revealedPrice,
             li.revealedBuyer
@@ -273,6 +322,15 @@ contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
         } catch {
             return (address(0), 0);
         }
+    }
+
+    function _verifyNoWinningBuyer(uint256 tokenId, address buyerPlain, bytes calldata buyerSig) internal {
+        eaddress pb = pendingBuyer[tokenId];
+        FHE.publishDecryptResult(pb, buyerPlain, buyerSig);
+        (address decrypted, bool ok) = FHE.getDecryptResultSafe(pb);
+
+        require(ok && decrypted == buyerPlain, "Stealth: bad decrypt");
+        require(buyerPlain == address(0), "Stealth: winner exists");
     }
 
     function _sendValue(address to, uint256 amount) internal {

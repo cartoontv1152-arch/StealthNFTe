@@ -27,3 +27,10 @@
 - [x] `web`: `npm run build`
 - [x] Sepolia deployment with updated contract addresses
 - [x] Browser and Chrome extension smoke test against the deployed Wave 4 contracts
+
+## Audit Hardening
+
+- [x] Block new sealed offers after seller reveal preparation.
+- [x] Add no-sale close path when all offers are below reserve.
+- [x] Add seller reclaim path after the settlement grace period.
+- [x] Add regression coverage for late bids, no-sale close, and expired reveal reclaim.

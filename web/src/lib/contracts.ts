@@ -3,6 +3,7 @@ import { arbitrumSepolia, baseSepolia, sepolia } from "viem/chains";
 
 export const APP_CHAIN_ID = 11155111;
 export const MAX_ENCRYPTED_WEI = 18_446_744_073_709_551_615n;
+export const SETTLEMENT_GRACE_PERIOD_SECONDS = 172_800;
 
 export const NFT_ADDRESS = (process.env.NEXT_PUBLIC_NFT_ADDRESS || "") as `0x${string}`;
 export const MARKETPLACE_ADDRESS = (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS || "") as `0x${string}`;
@@ -21,6 +22,7 @@ export const ENCRYPTED_UINT64_COMPONENTS = [
 ] as const;
 
 export const MARKETPLACE_ABI = [
+  { inputs: [], name: "SETTLEMENT_GRACE_PERIOD", outputs: [{ internalType: "uint64", name: "", type: "uint64" }], stateMutability: "view", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "allowPublicBuyer", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "allowPublicPrice", outputs: [], stateMutability: "nonpayable", type: "function" },
   {
@@ -34,6 +36,17 @@ export const MARKETPLACE_ABI = [
     type: "function",
   },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "cancelListing", outputs: [], stateMutability: "nonpayable", type: "function" },
+  {
+    inputs: [
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+      { internalType: "address", name: "buyerPlain", type: "address" },
+      { internalType: "bytes", name: "buyerSig", type: "bytes" },
+    ],
+    name: "closeNoSale",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
   {
     inputs: [
       { internalType: "uint256", name: "tokenId", type: "uint256" },
@@ -56,6 +69,7 @@ export const MARKETPLACE_ABI = [
       { internalType: "bool", name: "active", type: "bool" },
       { internalType: "bool", name: "bidReceived", type: "bool" },
       { internalType: "bool", name: "revealPrepared", type: "bool" },
+      { internalType: "uint64", name: "revealPreparedAt", type: "uint64" },
       { internalType: "uint32", name: "bidCount", type: "uint32" },
       { internalType: "uint64", name: "revealedPrice", type: "uint64" },
       { internalType: "address", name: "revealedBuyer", type: "address" },
@@ -93,6 +107,7 @@ export const MARKETPLACE_ABI = [
       { internalType: "bool", name: "active", type: "bool" },
       { internalType: "bool", name: "bidReceived", type: "bool" },
       { internalType: "bool", name: "revealPrepared", type: "bool" },
+      { internalType: "uint64", name: "revealPreparedAt", type: "uint64" },
       { internalType: "uint32", name: "bidCount", type: "uint32" },
       { internalType: "uint64", name: "revealedPrice", type: "uint64" },
       { internalType: "address", name: "revealedBuyer", type: "address" },
@@ -103,6 +118,7 @@ export const MARKETPLACE_ABI = [
   { inputs: [], name: "nft", outputs: [{ internalType: "contract IERC721", name: "", type: "address" }], stateMutability: "view", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "pendingBuyer", outputs: [{ internalType: "eaddress", name: "", type: "bytes32" }], stateMutability: "view", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "prepareSaleReveal", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "reclaimExpiredReveal", outputs: [], stateMutability: "nonpayable", type: "function" },
   {
     inputs: [
       { internalType: "uint256", name: "tokenId", type: "uint256" },
@@ -114,6 +130,8 @@ export const MARKETPLACE_ABI = [
     type: "function",
   },
   { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }, { indexed: false, internalType: "bytes32", name: "reserveHandle", type: "bytes32" }], name: "Listed", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }], name: "ExpiredRevealReclaimed", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }], name: "NoSaleClosed", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "buyer", type: "address" }, { indexed: false, internalType: "uint32", name: "bidCount", type: "uint32" }], name: "SealedOfferSubmitted", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "buyer", type: "address" }, { indexed: true, internalType: "address", name: "seller", type: "address" }, { indexed: false, internalType: "uint64", name: "price", type: "uint64" }, { indexed: false, internalType: "address", name: "royaltyReceiver", type: "address" }, { indexed: false, internalType: "uint256", name: "royaltyAmount", type: "uint256" }], name: "SaleFinalized", type: "event" },
 ] as const;
