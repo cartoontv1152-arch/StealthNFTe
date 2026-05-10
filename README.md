@@ -1,10 +1,12 @@
 # StealthNFT
 
-**Wave 3/4 production build for a privacy-first NFT marketplace on Fhenix/coFHE.**
+**Wave 3/4 complete production build for a privacy-first NFT marketplace on Fhenix/coFHE.**
 
 StealthNFT lets creators mint NFTs, list them with encrypted reserve prices, receive sealed offers, and settle the winning sale with threshold-network decrypt proofs. Public marketplace UX stays simple while the sensitive pricing and bidder path remains private until the seller prepares the final reveal.
 
 ## What Ships In This Version
+
+Wave 3 and Wave 4 are complete for the Sepolia testnet release. The app is wired to live deployed contracts and the remaining roadmap items are tracked as Wave 5 work.
 
 ### Wave 3
 
@@ -111,9 +113,18 @@ npm run dev
 
 ## Verification Status
 
-- `contracts`: `npm run compile`
-- `contracts`: `npm test`
-- `web`: `npm run build`
+- `contracts`: `npm run compile` passed
+- `contracts`: `npm test` passed
+- `web`: `npm run lint` passed
+- `web`: `npm run build` passed
+- Live Sepolia contract read passed against the deployed NFT and marketplace addresses
+
+## Wave 5 Backlog
+
+- Production indexing service for large collections and historical marketplace events.
+- Hosted deployment pipeline with environment validation and release checks.
+- Richer media upload flow with first-class IPFS/file picker UX.
+- Bidder notifications for reveal-ready and settlement-deadline states.
 
 See [WAVE_3_4_TODO.md](./WAVE_3_4_TODO.md) for the full checklist.
 

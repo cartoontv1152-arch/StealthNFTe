@@ -237,8 +237,9 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
 
   if (nfts.length === 0) {
     return (
-      <div className="border-y border-[rgb(var(--line))] px-6 py-16 text-center">
-        <h3 className="text-3xl text-[rgb(var(--ink))]">No NFTs yet.</h3>
+      <div className="muted-panel px-6 py-16 text-center">
+        <h3 className="text-2xl font-black text-[rgb(var(--ink))]">No NFTs yet</h3>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-[rgb(var(--muted))]">Mint the first item to open the market.</p>
       </div>
     );
   }
@@ -247,7 +248,7 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
     <>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {nfts.map((nft) => (
-          <article key={nft.tokenId} className="group overflow-hidden rounded-lg border border-[rgb(var(--line))] bg-[rgb(var(--surface))]">
+          <article key={nft.tokenId} className="group hero-media transition-transform duration-200 hover:-translate-y-1">
             <button
               type="button"
               className="block w-full text-left"
@@ -265,7 +266,7 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
               </div>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-2xl text-[rgb(var(--ink))]">{nft.name}</h3>
+                  <h3 className="min-w-0 truncate text-lg font-black text-[rgb(var(--ink))]">{nft.name}</h3>
                   <p className="text-sm font-extrabold text-[rgb(var(--teal))]">{nft.displayPrice}</p>
                 </div>
                 <div className="mt-4 flex items-center justify-between text-sm text-[rgb(var(--muted))]">
@@ -280,7 +281,7 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
 
       {selected ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(var(--ink)/0.36)] p-4 backdrop-blur-sm" onClick={() => setSelected(null)}>
-          <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-lg border border-[rgb(var(--line))] bg-[rgb(var(--surface))]" onClick={(event) => event.stopPropagation()}>
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-[rgb(var(--line))] bg-[rgb(var(--surface))]" onClick={(event) => event.stopPropagation()}>
             <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_380px]">
               <div className="relative min-h-[320px] bg-[rgb(var(--surface))]">
                 <img src={selected.image} alt={selected.name} className="h-full max-h-[720px] w-full object-cover" />
@@ -297,7 +298,7 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
               <div className="flex flex-col gap-5 p-5">
                 <div>
                   <p className="eyebrow">{selected.listingActive ? "Listed" : "Owned"}</p>
-                  <h2 className="mt-4 text-4xl text-[rgb(var(--ink))]">{selected.name}</h2>
+                  <h2 className="mt-3 text-3xl font-black text-[rgb(var(--ink))]">{selected.name}</h2>
                 </div>
 
                 <div className="divide-y divide-[rgb(var(--line))] border-y border-[rgb(var(--line))] text-sm">

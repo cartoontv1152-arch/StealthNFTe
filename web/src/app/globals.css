@@ -31,6 +31,10 @@ body {
   background: rgb(var(--paper));
   color: rgb(var(--ink));
   font-family: var(--font-body), sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 a {
@@ -93,38 +97,50 @@ img {
   h4,
   h5,
   h6 {
-    font-family: var(--font-display), serif;
+    font-family: var(--font-body), sans-serif;
     letter-spacing: 0;
   }
 }
 
 @layer components {
-  .page-wrap {
-    width: min(1120px, calc(100% - 48px));
-    margin-inline: auto;
-  }
-
-  @media (max-width: 640px) {
-    .page-wrap {
-      width: min(100% - 32px, 1120px);
-    }
-  }
-
   .soft-panel,
   .panel {
     border: 1px solid rgb(var(--line));
-    border-radius: 8px;
+    border-radius: 12px;
     background: rgb(var(--surface));
   }
 
+  .brand-mark {
+    font-family: var(--font-display), serif;
+  }
+
+  .page-heading {
+    max-width: 760px;
+  }
+
+  .page-title {
+    color: rgb(var(--ink));
+    font-size: 2.5rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    line-height: 0.96;
+  }
+
   .section-title {
-    font-size: 2.9rem;
-    line-height: 0.98;
+    color: rgb(var(--ink));
+    font-size: 3.2rem;
+    font-weight: 950;
+    letter-spacing: 0;
+    line-height: 0.92;
   }
 
   @media (min-width: 768px) {
+    .page-title {
+      font-size: 3.8rem;
+    }
+
     .section-title {
-      font-size: 5.2rem;
+      font-size: 4.7rem;
     }
   }
 
@@ -148,11 +164,12 @@ img {
     align-items: center;
     justify-content: center;
     gap: 0.55rem;
-    min-height: 2.65rem;
+    min-height: 2.75rem;
     border-radius: 8px;
-    padding: 0.72rem 1rem;
+    padding: 0.76rem 1.05rem;
     font-weight: 800;
-    font-size: 0.94rem;
+    font-size: 0.92rem;
+    line-height: 1;
     transition:
       transform 160ms ease,
       border-color 160ms ease,
@@ -172,7 +189,7 @@ img {
 
   .btn-secondary {
     border: 1px solid rgb(var(--line));
-    background: transparent;
+    background: rgb(var(--surface));
     color: rgb(var(--ink));
   }
 
@@ -189,8 +206,8 @@ img {
   }
 
   .metric-card {
-    border-top: 1px solid rgb(var(--line));
-    padding-top: 0.85rem;
+    border-left: 1px solid rgb(var(--line));
+    padding-left: 1rem;
   }
 
   .field-label {
@@ -208,6 +225,7 @@ img {
     background: rgb(var(--surface));
     color: rgb(var(--ink));
     padding: 0.78rem 0.86rem;
+    font-size: 0.95rem;
     transition:
       border-color 160ms ease,
       box-shadow 160ms ease;
@@ -234,6 +252,26 @@ img {
     color: rgb(var(--muted));
     font-size: 0.78rem;
     font-weight: 800;
+  }
+
+  .hero-media {
+    overflow: hidden;
+    border: 1px solid rgb(var(--line));
+    border-radius: 16px;
+    background: rgb(var(--surface));
+  }
+
+  .muted-panel {
+    border: 1px solid rgb(var(--line));
+    border-radius: 14px;
+    background: rgb(var(--surface) / 0.72);
+  }
+
+  .wallet-button-wrap button {
+    min-height: 2.75rem !important;
+    border-radius: 8px !important;
+    padding-inline: 1rem !important;
+    font-weight: 800 !important;
   }
 
   .status-pill::before {

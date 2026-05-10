@@ -170,9 +170,10 @@ export function NFTMinter() {
 
   if (!isConnected) {
     return (
-      <div className="border-y border-[rgb(var(--line))] px-2 py-16 text-center">
-        <h3 className="text-4xl text-[rgb(var(--ink))]">Connect wallet</h3>
-        <div className="mt-6 flex justify-center">
+      <div className="muted-panel px-5 py-14 text-center">
+        <h3 className="text-2xl font-black text-[rgb(var(--ink))]">Connect wallet</h3>
+        <p className="mx-auto mt-2 max-w-md text-sm text-[rgb(var(--muted))]">Mint and list on Sepolia from one flow.</p>
+        <div className="wallet-button-wrap mt-6 flex justify-center">
           <ConnectButton showBalance={false} />
         </div>
       </div>
@@ -180,10 +181,10 @@ export function NFTMinter() {
   }
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="border-y border-[rgb(var(--line))] py-6">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="muted-panel p-5 sm:p-6">
         <div className="mb-6 flex items-center justify-between gap-3">
-          <h2 className="text-3xl text-[rgb(var(--ink))]">Details</h2>
+          <h2 className="text-2xl font-black text-[rgb(var(--ink))]">Details</h2>
           <span className="status-pill">{stepLabels[step]}</span>
         </div>
 
@@ -252,7 +253,7 @@ export function NFTMinter() {
 
           <div className="border-t border-[rgb(var(--line))] pt-5">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-2xl text-[rgb(var(--ink))]">Traits</h3>
+              <h3 className="text-xl font-black text-[rgb(var(--ink))]">Traits</h3>
               <button type="button" onClick={addAttr} className="btn-secondary min-h-0 px-3 py-2 text-sm">
                 Add
               </button>
@@ -278,7 +279,7 @@ export function NFTMinter() {
         </div>
       </div>
 
-      <aside className="border-y border-[rgb(var(--line))] py-6 lg:sticky lg:top-28 lg:self-start">
+      <aside className="muted-panel p-5 lg:sticky lg:top-28 lg:self-start">
         <div className="space-y-4 text-sm font-semibold text-[rgb(var(--muted))]">
           <p>Status: <span className="text-[rgb(var(--ink))]">{status?.label || stepLabels[step]}</span></p>
           <p>Token: <span className="text-[rgb(var(--ink))]">{lastTokenId ? `#${lastTokenId.toString()}` : "pending"}</span></p>

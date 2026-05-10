@@ -32,41 +32,39 @@ export default function MarketplacePage() {
 
   return (
     <PageShell>
-      <section className="flex flex-col gap-8 pt-4">
-        <div>
+      <section className="pt-4">
+        <div className="page-heading">
           <p className="eyebrow">Marketplace</p>
-          <h1 className="mt-5 font-[family-name:var(--font-display)] text-5xl leading-none text-[rgb(var(--ink))] md:text-7xl">
-            Live listings
-          </h1>
+          <h1 className="page-title mt-4">Live listings</h1>
         </div>
 
-        <div className="grid gap-4 border-y border-[rgb(var(--line))] py-5 sm:grid-cols-3">
-          <div>
-            <p className="text-3xl font-extrabold">{activeListings.length}</p>
+        <div className="mt-8 grid gap-4 border-y border-[rgb(var(--line))] py-5 sm:grid-cols-3">
+          <div className="metric-card">
+            <p className="text-2xl font-black">{activeListings.length}</p>
             <p className="text-sm text-[rgb(var(--muted))]">listed</p>
           </div>
-          <div>
-            <p className="text-3xl font-extrabold">{nfts.length}</p>
+          <div className="metric-card">
+            <p className="text-2xl font-black">{nfts.length}</p>
             <p className="text-sm text-[rgb(var(--muted))]">NFTs</p>
           </div>
-          <div>
-            <p className="text-3xl font-extrabold">{totalOffers}</p>
+          <div className="metric-card">
+            <p className="text-2xl font-black">{totalOffers}</p>
             <p className="text-sm text-[rgb(var(--muted))]">offers</p>
           </div>
         </div>
       </section>
 
-      <section className="my-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <section className="my-8 flex flex-col gap-3 rounded-xl border border-[rgb(var(--line))] bg-[rgb(var(--surface))] p-3 lg:flex-row lg:items-center lg:justify-between">
         <input
           type="text"
           placeholder="Search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className="field lg:max-w-sm"
+          className="field border-transparent bg-[rgb(var(--paper))] lg:max-w-sm"
         />
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="field min-w-[180px] cursor-pointer">
+          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="field min-w-[180px] cursor-pointer border-transparent bg-[rgb(var(--paper))]">
             <option value="listed">Listed</option>
             <option value="recent">Recent</option>
             <option value="offers">Offers</option>
@@ -78,13 +76,13 @@ export default function MarketplacePage() {
             Mint
           </Link>
         </div>
-        {error ? <p className="mt-3 text-sm font-semibold text-[rgb(var(--coral))]">{error}</p> : null}
       </section>
+      {error ? <p className="-mt-5 mb-6 text-sm font-semibold text-[rgb(var(--coral))]">{error}</p> : null}
 
       <section className="pb-10">
         {isLoading && nfts.length === 0 ? (
-          <div className="border-y border-[rgb(var(--line))] py-16 text-center">
-            <h3 className="text-3xl text-[rgb(var(--ink))]">Loading...</h3>
+          <div className="muted-panel py-16 text-center">
+            <h3 className="text-2xl font-black text-[rgb(var(--ink))]">Loading...</h3>
           </div>
         ) : (
           <NFTGrid nfts={filtered} onRefresh={refresh} />

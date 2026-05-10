@@ -1,5 +1,12 @@
 # Wave 3/4 Production TODO
 
+## Release Status
+
+- [x] Wave 3 is complete and production-ready for Sepolia testnet use.
+- [x] Wave 4 is complete and production-ready for Sepolia testnet use.
+- [x] UI has been simplified and polished for the final Wave 3/4 release.
+- [x] Latest Sepolia contracts are deployed and wired into the app.
+
 ## Wave 3 - Production Features
 
 - [x] Replace mock price encryption with the browser `@cofhe/sdk` client lifecycle.
@@ -24,9 +31,11 @@
 
 - [x] `contracts`: `npm run compile`
 - [x] `contracts`: `npm test`
+- [x] `web`: `npm run lint`
 - [x] `web`: `npm run build`
 - [x] Sepolia deployment with updated contract addresses
 - [x] Browser and Chrome extension smoke test against the deployed Wave 4 contracts
+- [x] Live Sepolia read confirms deployed bytecode, marketplace NFT pointer, ERC-2981 read, and settlement grace period
 
 ## Audit Hardening
 
@@ -34,3 +43,12 @@
 - [x] Add no-sale close path when all offers are below reserve.
 - [x] Add seller reclaim path after the settlement grace period.
 - [x] Add regression coverage for late bids, no-sale close, and expired reveal reclaim.
+
+## Wave 5 Backlog
+
+- [ ] Production indexing service for large collections and historical marketplace events.
+- [ ] Full hosted deployment pipeline with environment validation and release checks.
+- [ ] Richer creator media upload flow with first-class IPFS/file picker UX.
+- [ ] Advanced bidder notifications for reveal-ready and settlement-deadline states.
+- [ ] Marketplace analytics, activity feed, and collection-level filtering.
+- [ ] Optional contract verification automation for each supported testnet/mainnet.
