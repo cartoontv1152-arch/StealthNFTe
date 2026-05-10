@@ -6,9 +6,8 @@ StealthNFT lets creators mint NFTs, list them with encrypted reserve prices, rec
 
 ## What Ships In This Version
 
-Wave 3 and Wave 4 are complete for the Sepolia testnet release. The app is wired to live deployed contracts and the remaining roadmap items are tracked as Wave 5 work.
-
-### Wave 3
+ 
+ 
 
 - Browser `@cofhe/sdk` integration using `createCofheConfig`, `createCofheClient`, wagmi public clients, and wallet clients.
 - One-flow creator UX: metadata, mint, approval, encrypted reserve, and marketplace listing.
@@ -17,7 +16,7 @@ Wave 3 and Wave 4 are complete for the Sepolia testnet release. The app is wired
 - On-chain marketplace indexing instead of demo listings.
 - Cleaner production UI with live status, empty states, and transaction progress.
 
-### Wave 4
+ 
 
 - Encrypted winning offer tracking with `FHE.gte` and `FHE.select`.
 - Reveal-only-on-win settlement: losing bidders are never decrypted.
