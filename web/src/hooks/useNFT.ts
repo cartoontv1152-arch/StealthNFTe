@@ -12,6 +12,7 @@ export function useNFT() {
       write: writeContract.writeContract.bind(writeContract),
       data: writeContract.data,
       isPending: writeContract.isPending,
+      error: writeContract.error,
     },
     address,
     NFT_ADDRESS,
