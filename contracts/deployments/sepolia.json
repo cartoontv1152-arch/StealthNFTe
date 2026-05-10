@@ -1,0 +1,9 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployer": "0x573f08604704227A8b9A6551009Bd39C668Ff8F8",
+  "contracts": {
+    "StealthNFT": "0xFFDb695Db282b12E7b82790152971Cca52518d59",
+    "StealthMarketplace": "0x24895bee0dD2196C3b3154A082d7eB58236771B4"
+  }
+}

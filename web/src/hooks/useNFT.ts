@@ -1,8 +1,7 @@
 "use client";
 
 import { useWriteContract, useAccount } from "wagmi";
-
-const NFT_ADDRESS = process.env.NEXT_PUBLIC_NFT_ADDRESS as `0x${string}`;
+import { NFT_ADDRESS } from "@/lib/contracts";
 
 export function useNFT() {
   const { address } = useAccount();

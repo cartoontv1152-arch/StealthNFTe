@@ -3,33 +3,51 @@ pragma solidity ^0.8.28;
 
 import {FHE, euint64, ebool, eaddress, InEuint64} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC2981} from "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @title StealthMarketplace
-/// @notice Listings store an encrypted ask (`euint64`). Offers are encrypted; `FHE.gte(offer, price)`
-///         drives an encrypted `pendingBuyer` via `FHE.select`. Settlement decrypts the winning buyer
-///         off-chain and finalizes on-chain (see Fhenix decrypt-with-proof pattern).
-contract StealthMarketplace is ERC721Holder {
+/// @notice Listings store encrypted reserve prices and encrypted winning offers. Settlement follows
+///         Fhenix's allowPublic + decryptForTx + publishDecryptResult pattern.
+contract StealthMarketplace is ERC721Holder, ReentrancyGuard {
     IERC721 public immutable nft;
+    uint64 public constant SETTLEMENT_GRACE_PERIOD = 2 days;
 
     struct Listing {
         address seller;
-        euint64 price;
+        euint64 reservePrice;
         bool active;
         bool bidReceived;
+        bool revealPrepared;
+        uint64 revealPreparedAt;
+        uint32 bidCount;
+        uint64 revealedPrice;
+        address revealedBuyer;
     }
 
     mapping(uint256 tokenId => Listing) public listings;
-    /// @notice Encrypted address selected when `offer >= price` (latest qualifying attempt wins).
+    /// @notice Encrypted address selected when `offer >= currentWinningOffer`.
     mapping(uint256 tokenId => eaddress) public pendingBuyer;
+    /// @notice Encrypted winning offer. Initialized to the encrypted reserve price.
+    mapping(uint256 tokenId => euint64) public highestOffer;
 
-    event Listed(uint256 indexed tokenId, address indexed seller);
-    event PurchaseAttempted(uint256 indexed tokenId, address indexed buyer);
-    event SalePrepared(uint256 indexed tokenId);
-    event SaleFinalized(uint256 indexed tokenId, address indexed buyer, address indexed seller);
+    event Listed(uint256 indexed tokenId, address indexed seller, bytes32 reserveHandle);
+    event SealedOfferSubmitted(uint256 indexed tokenId, address indexed buyer, uint32 bidCount);
+    event SalePrepared(uint256 indexed tokenId, bytes32 buyerHandle, bytes32 offerHandle);
+    event SaleFinalized(
+        uint256 indexed tokenId,
+        address indexed buyer,
+        address indexed seller,
+        uint64 price,
+        address royaltyReceiver,
+        uint256 royaltyAmount
+    );
     event ListingCancelled(uint256 indexed tokenId, address indexed seller);
-    event PriceRevealed(uint256 indexed tokenId, uint256 price);
-    event BuyerRevealed(uint256 indexed tokenId, address buyer);
+    event NoSaleClosed(uint256 indexed tokenId, address indexed seller);
+    event ExpiredRevealReclaimed(uint256 indexed tokenId, address indexed seller);
+    event PriceRevealPrepared(uint256 indexed tokenId, bytes32 reserveHandle);
 
     constructor(address _nft) {
         nft = IERC721(_nft);
@@ -46,42 +64,80 @@ contract StealthMarketplace is ERC721Holder {
         FHE.allowThis(p);
         FHE.allowSender(p);
 
-        listings[tokenId] = Listing({seller: msg.sender, price: p, active: true, bidReceived: false});
+        listings[tokenId] = Listing({
+            seller: msg.sender,
+            reservePrice: p,
+            active: true,
+            bidReceived: false,
+            revealPrepared: false,
+            revealPreparedAt: 0,
+            bidCount: 0,
+            revealedPrice: 0,
+            revealedBuyer: address(0)
+        });
+
+        highestOffer[tokenId] = p;
+        FHE.allowThis(highestOffer[tokenId]);
+        FHE.allowSender(highestOffer[tokenId]);
 
         pendingBuyer[tokenId] = FHE.asEaddress(address(0));
         FHE.allowThis(pendingBuyer[tokenId]);
 
-        emit Listed(tokenId, msg.sender);
+        emit Listed(tokenId, msg.sender, euint64.unwrap(p));
     }
 
-    /// @notice Submit an encrypted offer. Internally uses `FHE.gte(offer, price)` and `FHE.select`
-    ///         to update encrypted `pendingBuyer` without revealing either value on-chain.
-    function buyNFT(uint256 tokenId, InEuint64 calldata encOffer) external {
+    /// @notice Submit an encrypted offer. The current winner is updated with encrypted comparison
+    ///         only; losing bidders are not revealed during settlement.
+    function submitSealedOffer(uint256 tokenId, InEuint64 calldata encOffer) public {
         Listing storage li = listings[tokenId];
         require(li.active, "Stealth: not listed");
+        require(msg.sender != li.seller, "Stealth: seller cannot bid");
+        require(!li.revealPrepared, "Stealth: reveal prepared");
 
         euint64 offer = FHE.asEuint64(encOffer);
         FHE.allowThis(offer);
+        FHE.allowSender(offer);
 
-        ebool sufficient = FHE.gte(offer, li.price);
+        ebool sufficient = FHE.gte(offer, highestOffer[tokenId]);
+        highestOffer[tokenId] = FHE.select(sufficient, offer, highestOffer[tokenId]);
         pendingBuyer[tokenId] = FHE.select(
             sufficient,
             FHE.asEaddress(msg.sender),
             pendingBuyer[tokenId]
         );
+
+        FHE.allowThis(highestOffer[tokenId]);
         FHE.allowThis(pendingBuyer[tokenId]);
 
         li.bidReceived = true;
-        emit PurchaseAttempted(tokenId, msg.sender);
+        li.bidCount += 1;
+        emit SealedOfferSubmitted(tokenId, msg.sender, li.bidCount);
+    }
+
+    /// @notice Backward-compatible alias for the original Wave 2 UI action.
+    function buyNFT(uint256 tokenId, InEuint64 calldata encOffer) external {
+        submitSealedOffer(tokenId, encOffer);
     }
 
     /// @notice Seller allows the threshold network to decrypt the encrypted winning buyer for settlement.
-    function allowPublicBuyer(uint256 tokenId) external {
+    function prepareSaleReveal(uint256 tokenId) public {
         Listing storage li = listings[tokenId];
         require(li.active, "Stealth: not listed");
         require(msg.sender == li.seller, "Stealth: only seller");
+        require(li.bidReceived, "Stealth: no bids");
+        require(!li.revealPrepared, "Stealth: already prepared");
+
         FHE.allowPublic(pendingBuyer[tokenId]);
-        emit SalePrepared(tokenId);
+        FHE.allowPublic(highestOffer[tokenId]);
+
+        li.revealPrepared = true;
+        li.revealPreparedAt = uint64(block.timestamp);
+        emit SalePrepared(tokenId, eaddress.unwrap(pendingBuyer[tokenId]), euint64.unwrap(highestOffer[tokenId]));
+    }
+
+    /// @notice Backward-compatible alias for the original Wave 2 reveal action.
+    function allowPublicBuyer(uint256 tokenId) external {
+        prepareSaleReveal(tokenId);
     }
 
     /// @notice Seller may optionally reveal the listing price publicly (selective disclosure).
@@ -89,38 +145,114 @@ contract StealthMarketplace is ERC721Holder {
         Listing storage li = listings[tokenId];
         require(li.active, "Stealth: not listed");
         require(msg.sender == li.seller, "Stealth: only seller");
-        FHE.allowPublic(li.price);
-        emit PriceRevealed(tokenId, 0);
+        FHE.allowPublic(li.reservePrice);
+        emit PriceRevealPrepared(tokenId, euint64.unwrap(li.reservePrice));
     }
 
-    /// @notice After decrypting `pendingBuyer` off-chain (`decryptForTx`), the buyer publishes the result.
-    /// @dev Sends `msg.value` to the seller as settlement (testnet ETH).
+    /// @notice After decrypting `pendingBuyer` and `highestOffer` off-chain (`decryptForTx`),
+    ///         the winning buyer publishes both threshold signatures and settles with ETH.
     function finalizeSale(
         uint256 tokenId,
         address buyerPlain,
-        bytes calldata buyerSig
-    ) external payable {
+        bytes calldata buyerSig,
+        uint64 offerPlain,
+        bytes calldata offerSig
+    ) external payable nonReentrant {
         Listing storage li = listings[tokenId];
         require(li.active, "Stealth: inactive");
+        require(li.revealPrepared, "Stealth: reveal not prepared");
 
-        eaddress pb = pendingBuyer[tokenId];
-        FHE.publishDecryptResult(pb, buyerPlain, buyerSig);
+        _verifyWinningBuyer(tokenId, buyerPlain, buyerSig);
+        _verifyWinningOffer(tokenId, offerPlain, offerSig);
 
-        (address decrypted, bool ok) = FHE.getDecryptResultSafe(pb);
-        require(ok && decrypted == buyerPlain, "Stealth: bad decrypt");
-        require(buyerPlain != address(0), "Stealth: no buyer");
-        require(msg.sender == buyerPlain, "Stealth: only buyer");
-
+        address seller = li.seller;
         li.active = false;
+        li.revealedBuyer = buyerPlain;
+        li.revealedPrice = offerPlain;
 
         nft.safeTransferFrom(address(this), buyerPlain, tokenId);
 
-        if (msg.value > 0) {
-            (bool sent, ) = payable(li.seller).call{value: msg.value}("");
-            require(sent, "Stealth: pay failed");
+        (address royaltyReceiver, uint256 royaltyAmount) = _settleFunds(tokenId, seller, uint256(offerPlain));
+        emit SaleFinalized(tokenId, buyerPlain, seller, offerPlain, royaltyReceiver, royaltyAmount);
+    }
+
+    function _verifyWinningBuyer(uint256 tokenId, address buyerPlain, bytes calldata buyerSig) internal {
+        eaddress pb = pendingBuyer[tokenId];
+        FHE.publishDecryptResult(pb, buyerPlain, buyerSig);
+        (address decrypted, bool ok) = FHE.getDecryptResultSafe(pb);
+
+        require(ok && decrypted == buyerPlain, "Stealth: bad decrypt");
+        require(buyerPlain != address(0), "Stealth: no buyer");
+        require(msg.sender == buyerPlain, "Stealth: only buyer");
+    }
+
+    function _verifyWinningOffer(uint256 tokenId, uint64 offerPlain, bytes calldata offerSig) internal {
+        euint64 winningOffer = highestOffer[tokenId];
+        FHE.publishDecryptResult(winningOffer, offerPlain, offerSig);
+        (uint64 decryptedOffer, bool offerOk) = FHE.getDecryptResultSafe(winningOffer);
+
+        require(offerOk && decryptedOffer == offerPlain, "Stealth: bad offer decrypt");
+        require(msg.value >= uint256(offerPlain), "Stealth: insufficient payment");
+    }
+
+    function _settleFunds(uint256 tokenId, address seller, uint256 salePrice)
+        internal
+        returns (address royaltyReceiver, uint256 royaltyAmount)
+    {
+        (royaltyReceiver, royaltyAmount) = _royaltyInfo(tokenId, salePrice);
+        if (royaltyReceiver == seller) {
+            royaltyAmount = 0;
         }
 
-        emit SaleFinalized(tokenId, buyerPlain, li.seller);
+        if (royaltyAmount > 0) {
+            _sendValue(royaltyReceiver, royaltyAmount);
+        }
+
+        _sendValue(seller, salePrice - royaltyAmount);
+
+        uint256 refund = msg.value - salePrice;
+        if (refund > 0) {
+            _sendValue(msg.sender, refund);
+        }
+    }
+
+    /// @notice Close a reveal where no encrypted offer met the reserve. The seller proves the
+    ///         revealed buyer handle is the zero address and receives the NFT back.
+    function closeNoSale(
+        uint256 tokenId,
+        address buyerPlain,
+        bytes calldata buyerSig
+    ) external nonReentrant {
+        Listing storage li = listings[tokenId];
+        require(li.active, "Stealth: inactive");
+        require(li.revealPrepared, "Stealth: reveal not prepared");
+        require(msg.sender == li.seller, "Stealth: only seller");
+
+        _verifyNoWinningBuyer(tokenId, buyerPlain, buyerSig);
+
+        address seller = li.seller;
+        li.active = false;
+        li.revealedBuyer = address(0);
+        nft.safeTransferFrom(address(this), seller, tokenId);
+        emit NoSaleClosed(tokenId, seller);
+    }
+
+    /// @notice If a revealed winning buyer does not settle, the seller can recover the NFT after
+    ///         the grace period. This prevents unescrowed sealed offers from locking inventory.
+    function reclaimExpiredReveal(uint256 tokenId) external nonReentrant {
+        Listing storage li = listings[tokenId];
+        require(li.active, "Stealth: inactive");
+        require(li.revealPrepared, "Stealth: reveal not prepared");
+        require(msg.sender == li.seller, "Stealth: only seller");
+        require(
+            block.timestamp > uint256(li.revealPreparedAt) + SETTLEMENT_GRACE_PERIOD,
+            "Stealth: grace active"
+        );
+
+        address seller = li.seller;
+        li.active = false;
+        nft.safeTransferFrom(address(this), seller, tokenId);
+        emit ExpiredRevealReclaimed(tokenId, seller);
     }
 
     /// @notice Cancel before any purchase attempt (plaintext guard).
@@ -135,4 +267,78 @@ contract StealthMarketplace is ERC721Holder {
         emit ListingCancelled(tokenId, li.seller);
     }
 
+    function getListingCore(uint256 tokenId)
+        external
+        view
+        returns (
+            address seller,
+            bytes32 reserveHandle,
+            bool active,
+            bool bidReceived,
+            bool revealPrepared,
+            uint64 revealPreparedAt,
+            uint32 bidCount,
+            uint64 revealedPrice,
+            address revealedBuyer
+        )
+    {
+        Listing storage li = listings[tokenId];
+        return (
+            li.seller,
+            euint64.unwrap(li.reservePrice),
+            li.active,
+            li.bidReceived,
+            li.revealPrepared,
+            li.revealPreparedAt,
+            li.bidCount,
+            li.revealedPrice,
+            li.revealedBuyer
+        );
     }
+
+    function getSettlementHandles(uint256 tokenId)
+        external
+        view
+        returns (bytes32 highestOfferHandle, bytes32 pendingBuyerHandle)
+    {
+        return (euint64.unwrap(highestOffer[tokenId]), eaddress.unwrap(pendingBuyer[tokenId]));
+    }
+
+    function _royaltyInfo(uint256 tokenId, uint256 salePrice) internal view returns (address receiver, uint256 amount) {
+        try IERC165(address(nft)).supportsInterface(type(IERC2981).interfaceId) returns (bool supported) {
+            if (!supported) {
+                return (address(0), 0);
+            }
+
+            try IERC2981(address(nft)).royaltyInfo(tokenId, salePrice) returns (address royaltyReceiver, uint256 royaltyAmount) {
+                if (royaltyReceiver == address(0) || royaltyAmount >= salePrice) {
+                    return (address(0), 0);
+                }
+
+                return (royaltyReceiver, royaltyAmount);
+            } catch {
+                return (address(0), 0);
+            }
+        } catch {
+            return (address(0), 0);
+        }
+    }
+
+    function _verifyNoWinningBuyer(uint256 tokenId, address buyerPlain, bytes calldata buyerSig) internal {
+        eaddress pb = pendingBuyer[tokenId];
+        FHE.publishDecryptResult(pb, buyerPlain, buyerSig);
+        (address decrypted, bool ok) = FHE.getDecryptResultSafe(pb);
+
+        require(ok && decrypted == buyerPlain, "Stealth: bad decrypt");
+        require(buyerPlain == address(0), "Stealth: winner exists");
+    }
+
+    function _sendValue(address to, uint256 amount) internal {
+        if (amount == 0) {
+            return;
+        }
+
+        (bool sent, ) = payable(to).call{value: amount}("");
+        require(sent, "Stealth: pay failed");
+    }
+}
