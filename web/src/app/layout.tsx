@@ -14,8 +14,33 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "StealthNFT | Private NFT Marketplace",
-  description: "A polished privacy-first NFT marketplace for encrypted minting, sealed offers, and selective disclosure.",
+  metadataBase: new URL("https://stealth-nft.vercel.app"),
+  title: {
+    default: "StealthNFT | Private NFT Marketplace",
+    template: "%s | StealthNFT",
+  },
+  description:
+    "Mint NFTs, encrypt reserve prices, collect sealed offers, and settle winning sales on Sepolia with CoFHE privacy.",
+  applicationName: "StealthNFT",
+  keywords: ["StealthNFT", "Fhenix", "CoFHE", "NFT marketplace", "encrypted auction", "Sepolia"],
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  openGraph: {
+    title: "StealthNFT | Private NFT Marketplace",
+    description:
+      "A working Sepolia NFT marketplace with encrypted reserves, sealed offers, IPFS uploads, and on-chain settlement.",
+    url: "https://stealth-nft.vercel.app",
+    siteName: "StealthNFT",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "StealthNFT | Private NFT Marketplace",
+    description: "Encrypted reserves, sealed offers, and verified NFT settlement on Sepolia.",
+  },
 };
 
 export default function RootLayout({

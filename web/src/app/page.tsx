@@ -109,7 +109,7 @@ export default function Home() {
         <div className="feature-lines">
           <article className="feature-line">
             <h3>Creator uploads</h3>
-            <p>Media and metadata pin through Pinata/IPFS when configured, with a safe fallback for testnet demos.</p>
+            <p>Artwork uploads through the app and pins to Pinata/IPFS before the token is minted.</p>
           </article>
           <article className="feature-line">
             <h3>Live indexing</h3>

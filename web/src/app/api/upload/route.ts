@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    error: "Media uploads require valid Pinata credentials so artwork is stored off-chain. Add Pinata credentials or paste an existing ipfs:// / https:// image URL.",
+    error: "Media uploads require valid Pinata credentials so artwork is pinned before minting. Check the server upload configuration and try again.",
   }, { status: 503 });
 }
 
