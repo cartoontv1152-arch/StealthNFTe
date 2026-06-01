@@ -1,14 +1,14 @@
 {
   "network": "sepolia",
   "chainId": 11155111,
-  "deployer": "0xB3A78E23993cc416DF79c8E954e427Ef15063b20",
-  "deploymentBlock": 10963061,
+  "deployer": "0x7c298d22acc23c5931B3F1d6aB5D9f6Ded85B1b7",
+  "deploymentBlock": 10966950,
   "contracts": {
-    "StealthNFT": "0xb24b2D0e6814360Ef256db25945F169252b2c041",
-    "StealthMarketplace": "0xaECFe3d81F43b5Da4a5E32930377b529195E592E"
+    "StealthNFT": "0x0b5fEf198Ca8768b29d1fdb0cc47d756D309164B",
+    "StealthMarketplace": "0xA890928d677bB01041cd229F9004F09755dac880"
   },
   "transactions": {
-    "StealthNFT": "0x2f2ace1ef2fdb248d12d5a9853f4b6f2e9e8faaad316c60fe8e6be0b76b53119",
-    "StealthMarketplace": "0xdc605642e681bbb1a795202de7f437d8cb96205843236651be5dc26c5d53ca4b"
+    "StealthNFT": "0xa4df472a65efd7a8f94635a03cde7d7068474e98c2f54a032e8eb26013103a57",
+    "StealthMarketplace": "0xae78ceb838faed263f9283711aaec6c90e5318c2630004f60f873bbec1ba6a42"
   }
 }

@@ -504,6 +504,46 @@ img {
     background: var(--color-surface);
   }
 
+  .dropzone[data-state="ready"] {
+    border-color: color-mix(in oklch, var(--color-success) 42%, var(--color-rule-strong));
+    background: var(--color-success-soft);
+  }
+
+  .dropzone[data-state="uploading"] {
+    border-color: var(--color-action);
+    background: var(--color-action-soft);
+  }
+
+  .upload-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+    border-top: var(--rule-thin) solid var(--color-rule);
+    padding-top: var(--space-md);
+  }
+
+  .upload-summary strong,
+  .upload-summary span {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .upload-summary strong {
+    color: var(--color-ink-strong);
+    font-size: var(--text-sm);
+    font-weight: 900;
+  }
+
+  .upload-summary span {
+    margin-top: var(--space-2xs);
+    color: var(--color-muted);
+    font-size: var(--text-xs);
+    font-weight: 750;
+  }
+
   .activity-list {
     display: grid;
     gap: var(--space-sm);
@@ -578,7 +618,7 @@ img {
     position: relative;
     display: grid;
     width: 100vw;
-    min-height: clamp(34rem, calc(100svh - 8rem), 44rem);
+    min-height: clamp(32rem, calc(100svh - 12rem), 40rem);
     margin-inline: calc(50% - 50vw);
     margin-top: calc(-1 * var(--main-pad-top));
     align-items: stretch;
@@ -1019,7 +1059,7 @@ img {
 @media (max-width: 900px) {
   @layer components {
     .home-hero {
-      min-height: max(35rem, calc(100svh - 8.5rem));
+      min-height: max(34rem, calc(100svh - 10rem));
     }
 
     .home-hero-scrim {
@@ -1092,6 +1132,15 @@ img {
     .process-list li {
       grid-template-columns: 3rem minmax(0, 1fr);
       gap: var(--space-md);
+    }
+
+    .upload-summary {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .upload-summary .btn-secondary {
+      width: 100%;
     }
   }
 }

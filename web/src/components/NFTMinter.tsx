@@ -43,6 +43,7 @@ export function NFTMinter() {
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [mediaStorage, setMediaStorage] = useState<MediaStorage>("idle");
+  const [mediaName, setMediaName] = useState("");
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [privateNotes, setPrivateNotes] = useState("");
   const [price, setPrice] = useState("");
@@ -79,12 +80,19 @@ export function NFTMinter() {
       const uploaded = await uploadMediaFile(file);
       setImageUrl(uploaded.uri);
       setMediaStorage(uploaded.storage);
+      setMediaName(file.name || "Uploaded artwork");
       toast.success("Artwork pinned to IPFS.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Media upload failed.");
     } finally {
       setUploadingMedia(false);
     }
+  };
+
+  const clearUploadedMedia = () => {
+    setImageUrl("");
+    setMediaStorage("idle");
+    setMediaName("");
   };
 
   const handleMint = async () => {
@@ -178,6 +186,7 @@ export function NFTMinter() {
       setDescription("");
       setImageUrl("");
       setMediaStorage("idle");
+      setMediaName("");
       setPrivateNotes("");
       setPrice("");
       setAttrs([{ trait_type: "Edition", value: "Genesis" }]);
@@ -219,7 +228,15 @@ export function NFTMinter() {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <label className="dropzone">
+            <label
+              className="dropzone"
+              data-state={uploadingMedia ? "uploading" : imageUrl ? "ready" : undefined}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                void handleMediaFile(event.dataTransfer.files?.[0]);
+              }}
+            >
               <input
                 type="file"
                 accept="image/*"
@@ -230,7 +247,7 @@ export function NFTMinter() {
               <span>
                 <strong className="block text-[var(--color-ink-strong)]">{uploadingMedia ? "Uploading artwork" : "Choose artwork"}</strong>
                 <span className="mt-2 block text-sm leading-6 text-[var(--color-muted)]">
-                  Upload an image to pin it through Pinata/IPFS before minting.
+                  Click or drop an image here. Pinata stores it on IPFS before minting.
                 </span>
               </span>
             </label>
@@ -245,6 +262,18 @@ export function NFTMinter() {
               )}
             </div>
           </div>
+
+          {imageUrl ? (
+            <div className="upload-summary">
+              <div className="min-w-0">
+                <strong>{mediaName || "Artwork uploaded"}</strong>
+                <span>{shortUri(imageUrl)}</span>
+              </div>
+              <button type="button" onClick={clearUploadedMedia} disabled={submitting || uploadingMedia} className="btn-secondary min-h-0 px-3 py-2 text-sm">
+                Remove
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="panel p-5 sm:p-6">
@@ -394,6 +423,14 @@ export function NFTMinter() {
       </aside>
     </div>
   );
+}
+
+function shortUri(uri: string) {
+  if (uri.length <= 42) {
+    return uri;
+  }
+
+  return `${uri.slice(0, 22)}...${uri.slice(-12)}`;
 }
 
 function readMintedTokenId(logs: readonly Log[], receiver: `0x${string}`) {

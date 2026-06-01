@@ -8,7 +8,7 @@ Set these in your Vercel project settings:
 - `NEXT_PUBLIC_SEPOLIA_RPC_URL` - Sepolia RPC URL
 - `NEXT_PUBLIC_MARKETPLACE_ADDRESS` - Deployed marketplace contract
 - `NEXT_PUBLIC_NFT_ADDRESS` - Deployed NFT contract
-- `NEXT_PUBLIC_MARKETPLACE_DEPLOYMENT_BLOCK` - first block to scan for marketplace history (`10963061` for the current Sepolia deployment)
+- `NEXT_PUBLIC_MARKETPLACE_DEPLOYMENT_BLOCK` - first block to scan for marketplace history (`10966950` for the current Sepolia deployment)
 
 ### Optional
 - `PINATA_JWT` - server-only Pinata token for IPFS metadata pinning

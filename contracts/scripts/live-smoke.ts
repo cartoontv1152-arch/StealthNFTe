@@ -65,7 +65,7 @@ async function main() {
 
   const [seller] = await hre.ethers.getSigners();
   const buyer = hre.ethers.Wallet.createRandom().connect(hre.ethers.provider);
-  const fundAmount = parseEther("0.05");
+  const fundAmount = parseEther(process.env.LIVE_SMOKE_BUYER_FUNDS || "0.05");
 
   console.log("seller:", seller.address);
   console.log("buyer:", buyer.address);

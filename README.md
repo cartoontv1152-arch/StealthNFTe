@@ -110,8 +110,8 @@ Important limitation: final settlement intentionally reveals the winning buyer a
 
 | Contract | Address |
 | --- | --- |
-| StealthNFT | `0xb24b2D0e6814360Ef256db25945F169252b2c041` |
-| StealthMarketplace | `0xaECFe3d81F43b5Da4a5E32930377b529195E592E` |
+| StealthNFT | `0x0b5fEf198Ca8768b29d1fdb0cc47d756D309164B` |
+| StealthMarketplace | `0xA890928d677bB01041cd229F9004F09755dac880` |
 
 Deployment metadata is stored in `contracts/deployments/sepolia.json`.
 
@@ -119,9 +119,9 @@ Deployment metadata is stored in `contracts/deployments/sepolia.json`.
 | --- | --- |
 | Network | Sepolia |
 | Chain ID | `11155111` |
-| Deployment block | `10963061` |
-| NFT deployment tx | `0x2f2ace1ef2fdb248d12d5a9853f4b6f2e9e8faaad316c60fe8e6be0b76b53119` |
-| Marketplace deployment tx | `0xdc605642e681bbb1a795202de7f437d8cb96205843236651be5dc26c5d53ca4b` |
+| Deployment block | `10966950` |
+| NFT deployment tx | `0xa4df472a65efd7a8f94635a03cde7d7068474e98c2f54a032e8eb26013103a57` |
+| Marketplace deployment tx | `0xae78ceb838faed263f9283711aaec6c90e5318c2630004f60f873bbec1ba6a42` |
 
 ## Project Structure
 
@@ -177,9 +177,9 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 
 ```bash
 NEXT_PUBLIC_SEPOLIA_RPC_URL=https://rpc.sepolia.ethpandaops.io
-NEXT_PUBLIC_NFT_ADDRESS=0xb24b2D0e6814360Ef256db25945F169252b2c041
-NEXT_PUBLIC_MARKETPLACE_ADDRESS=0xaECFe3d81F43b5Da4a5E32930377b529195E592E
-NEXT_PUBLIC_MARKETPLACE_DEPLOYMENT_BLOCK=10963061
+NEXT_PUBLIC_NFT_ADDRESS=0x0b5fEf198Ca8768b29d1fdb0cc47d756D309164B
+NEXT_PUBLIC_MARKETPLACE_ADDRESS=0xA890928d677bB01041cd229F9004F09755dac880
+NEXT_PUBLIC_MARKETPLACE_DEPLOYMENT_BLOCK=10966950
 
 # Server-only Pinata credentials.
 # The app prefers API key/secret when present and falls back to JWT.
