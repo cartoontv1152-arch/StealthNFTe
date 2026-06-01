@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="web/src/app/icon.svg" alt="StealthNFT favicon" width="88" />
+</p>
+
 # StealthNFT
 
 **A privacy-first NFT marketplace on Fhenix/coFHE for encrypted reserves, sealed offers, IPFS artwork uploads, and on-chain settlement.**
