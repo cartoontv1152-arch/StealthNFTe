@@ -1,8 +1,8 @@
 # StealthNFT
 
-**A privacy-first NFT marketplace on Fhenix/coFHE for encrypted reserves, sealed offers, and on-chain settlement.**
+**A privacy-first NFT marketplace on Fhenix/coFHE for encrypted reserves, sealed offers, IPFS artwork uploads, and on-chain settlement.**
 
-StealthNFT is a production-ready Sepolia testnet app built for WaveHack. It lets creators mint NFTs, list them with encrypted reserve prices, accept sealed offers, and settle the winning sale with verifiable threshold-network decrypt proofs. The marketplace feels like a normal NFT app for users, while the sensitive auction data stays encrypted on-chain until the seller intentionally prepares the final reveal.
+StealthNFT is a Sepolia testnet product built for WaveHack. It lets creators upload artwork, mint NFTs, list them with encrypted reserve prices, accept sealed collector offers, and settle the winning sale with verifiable threshold-network decrypt proofs. The marketplace feels like a normal NFT app for users, while sensitive auction data stays encrypted on-chain until the seller intentionally prepares the final reveal.
 
 Live app: [https://stealth-nft.vercel.app](https://stealth-nft.vercel.app)
 
@@ -16,9 +16,41 @@ The app supports three main users:
 - Collectors connect a wallet, submit encrypted sealed offers, and finalize purchases only when they are the winning buyer.
 - Sellers prepare the final reveal, close no-sale listings, reclaim expired buyer settlements, and track listing activity.
 
+## Why Use StealthNFT
+
+Traditional NFT marketplaces make pricing strategy public. A creator's reserve price can anchor buyers, competitors can watch collector behavior, and losing offers leave market intelligence behind. StealthNFT keeps the user experience familiar while moving the sensitive parts of the sale into encrypted on-chain state.
+
+Use StealthNFT when you want:
+
+- A creator-friendly mint-to-market flow without manually switching between upload tools, contract calls, and marketplace forms.
+- Private reserve prices so sellers can protect their pricing strategy.
+- Sealed offers so collectors can bid without exposing their exact appetite to the whole market.
+- On-chain settlement with explicit proofs instead of an off-chain auction server.
+- A working Fhenix/coFHE demo that shows encrypted comparisons, threshold decrypts, and real NFT escrow together.
+
+## User Journeys
+
+### Creator Journey
+
+1. Connect a Sepolia wallet.
+2. Upload artwork through the app; the server pins it to Pinata/IPFS.
+3. Add name, description, royalty basis points, traits, and an optional private note commitment.
+4. Enter the reserve price.
+5. Mint the NFT, approve escrow, encrypt the reserve, and list the NFT from one screen.
+6. Return to the marketplace to monitor offers, prepare a reveal, close a no-sale, or reclaim an expired settlement.
+
+### Collector Journey
+
+1. Browse live listings from the marketplace event index.
+2. Open a listing and submit a sealed offer with the fixed bid bond.
+3. Wait for the seller to prepare the reveal.
+4. If selected as the winner, publish decrypt-for-transaction proofs and pay the revealed winning amount.
+5. If not selected or if the listing closes with no sale, withdraw the bid bond.
+
 ## Core Features
 
 - NFT minting with public preview metadata, optional private metadata commitment, and ERC-2981 royalties.
+- Upload-only creator media flow: users choose an image file and the app pins it to Pinata/IPFS before minting.
 - Encrypted reserve prices using browser-side `@cofhe/sdk` input encryption.
 - Sealed encrypted offers with on-chain encrypted comparison via `FHE.gte`, `FHE.and`, and `FHE.select`.
 - Winner-only reveal flow: losing bidders are not decrypted during settlement.
@@ -26,7 +58,7 @@ The app supports three main users:
 - Fixed `0.001 ETH` bid bond to reduce spam, refund losing/no-sale bidders, and compensate sellers when a winning buyer expires.
 - Seller recovery paths for no-sale listings, expired reveals, and safe cancellation before bids.
 - Live event indexer for minted tokens, listings, offers, reveal preparation, settlement, cancellation, no-sale close, and expired reclaim events.
-- Pinata/IPFS upload routes for artwork and metadata, with a safe URL-entry fallback when credentials are not configured.
+- Pinata/IPFS upload routes for artwork and metadata.
 - Marketplace filters, analytics summary, activity feed, notification center, responsive UI, and production Vercel deployment.
 
 ## How It Works
@@ -121,7 +153,7 @@ web/
 - `web/src/app/api/indexer/marketplace/route.ts`
   Hosted event indexer for marketplace state and activity.
 - `web/src/app/api/upload/route.ts`
-  Image upload route backed by Pinata/IPFS.
+  Required image upload route backed by Pinata/IPFS.
 - `web/src/app/api/metadata/route.ts`
   Metadata pinning route with bounded data URI fallback.
 
@@ -233,6 +265,7 @@ Optional Vercel environment variables:
 
 - This is deployed for Sepolia testnet use. Mainnet deployment should use fresh wallets, fresh Pinata credentials, verified contracts, and a production RPC provider with rate limits suitable for public traffic.
 - The app does not require an OpenAI API key.
+- Creator artwork uploads require valid server-side Pinata credentials; the UI no longer asks users to paste image URLs.
 - The deployer private key is only needed for contract deployment and smoke scripts. It is not needed by the web app.
 - If contracts are redeployed, update `contracts/deployments/sepolia.json`, Vercel env vars, and the web env addresses together.
 - If the Vercel project is not connected to a Git repository, branch-scoped Preview env vars cannot be configured from the Vercel CLI.
