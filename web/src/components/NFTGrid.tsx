@@ -2,13 +2,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { toast } from "sonner";
 import { formatEther, getAddress, parseEther, zeroAddress } from "viem";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { useCoFHE } from "@/hooks/useCoFHE";
 import { shortAddress, type MarketplaceNFT } from "@/hooks/useStealthMarketplace";
-import { APP_CHAIN_ID, MARKETPLACE_ABI, MARKETPLACE_ADDRESS, MAX_ENCRYPTED_WEI } from "@/lib/contracts";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
+import { APP_CHAIN_ID, BID_BOND_WEI, MARKETPLACE_ABI, MARKETPLACE_ADDRESS, MAX_ENCRYPTED_WEI } from "@/lib/contracts";
 
 interface NFTGridProps {
   nfts: MarketplaceNFT[];
@@ -21,7 +21,7 @@ type RevealedSettlement = {
 };
 
 export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
-  const [selected, setSelected] = useState<MarketplaceNFT | null>(null);
+  const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
   const [offerAmount, setOfferAmount] = useState("");
   const [revealed, setRevealed] = useState<RevealedSettlement | null>(null);
   const [action, setAction] = useState<string | null>(null);
@@ -29,19 +29,26 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
   const publicClient = usePublicClient({ chainId: APP_CHAIN_ID });
   const { writeContractAsync } = useWriteContract();
   const { encryptUint64, decryptAddressForTx, decryptUint64ForTx, busy, status } = useCoFHE();
+  const selected = useMemo(
+    () => (selectedTokenId === null ? null : nfts.find((nft) => nft.tokenId === selectedTokenId) || null),
+    [nfts, selectedTokenId]
+  );
 
   const selectedIsSeller = useMemo(
     () => Boolean(selected && address && selected.seller.toLowerCase() === address.toLowerCase()),
     [address, selected]
   );
 
-  const waitAndRefresh = async (hash: `0x${string}`) => {
+  const waitAndRefresh = async (hash: `0x${string}`, closeModal = false) => {
     if (!publicClient) {
       return;
     }
 
     await publicClient.waitForTransactionReceipt({ hash });
     await onRefresh?.();
+    if (closeModal) {
+      setSelectedTokenId(null);
+    }
   };
 
   const submitOffer = async (nft: MarketplaceNFT) => {
@@ -82,15 +89,17 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
     try {
       const encryptedOffer = await encryptUint64(offerWei);
       const contractOffer = { ...encryptedOffer, signature: encryptedOffer.signature as `0x${string}` };
+      const bondTopUp = nft.myBidBond >= BID_BOND_WEI ? 0n : BID_BOND_WEI - nft.myBidBond;
       setAction("Submitting sealed offer");
       const hash = await writeContractAsync({
         address: MARKETPLACE_ADDRESS,
         abi: MARKETPLACE_ABI,
         functionName: "submitSealedOffer",
         args: [BigInt(nft.tokenId), contractOffer],
+        value: bondTopUp,
       });
       await waitAndRefresh(hash);
-      toast.success("Sealed offer submitted.");
+      toast.success(bondTopUp > 0n ? "Sealed offer submitted with refundable bid bond." : "Sealed offer submitted.");
       setOfferAmount("");
     } catch (error) {
       console.error(error);
@@ -128,9 +137,8 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
         functionName: "cancelListing",
         args: [BigInt(nft.tokenId)],
       });
-      await waitAndRefresh(hash);
+      await waitAndRefresh(hash, true);
       toast.success("Listing cancelled.");
-      setSelected(null);
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Cancel failed.");
@@ -158,9 +166,8 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
         functionName: "closeNoSale",
         args: [BigInt(nft.tokenId), buyer, buyerResult.signature as `0x${string}`],
       });
-      await waitAndRefresh(hash);
+      await waitAndRefresh(hash, true);
       toast.success("No-sale reveal closed and NFT returned.");
-      setSelected(null);
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "No-sale close failed.");
@@ -170,20 +177,48 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
   };
 
   const reclaimExpiredReveal = async (nft: MarketplaceNFT) => {
-    setAction("Reclaiming expired reveal");
+    setAction("Decrypting expired winner");
     try {
+      const buyerResult = await decryptAddressForTx(nft.pendingBuyerHandle);
+      const buyer = getAddress(buyerResult.decryptedValue) as `0x${string}`;
+      setRevealed({ buyer, offer: 0n });
+
+      if (buyer.toLowerCase() === zeroAddress) {
+        toast.error("No winning buyer exists. Use the no-sale close action instead.");
+        return;
+      }
+
+      setAction("Reclaiming expired reveal");
       const hash = await writeContractAsync({
         address: MARKETPLACE_ADDRESS,
         abi: MARKETPLACE_ABI,
         functionName: "reclaimExpiredReveal",
-        args: [BigInt(nft.tokenId)],
+        args: [BigInt(nft.tokenId), buyer, buyerResult.signature as `0x${string}`],
       });
-      await waitAndRefresh(hash);
-      toast.success("Expired reveal reclaimed and NFT returned.");
-      setSelected(null);
+      await waitAndRefresh(hash, true);
+      toast.success("Expired reveal reclaimed, bond forfeited, and NFT returned.");
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Reclaim failed.");
+    } finally {
+      setAction(null);
+    }
+  };
+
+  const withdrawBidBond = async (nft: MarketplaceNFT) => {
+    setAction("Withdrawing bid bond");
+    try {
+      const hash = await writeContractAsync({
+        address: MARKETPLACE_ADDRESS,
+        abi: MARKETPLACE_ABI,
+        functionName: "withdrawBidBond",
+        args: [BigInt(nft.tokenId)],
+      });
+      await waitAndRefresh(hash, true);
+      toast.success("Bid bond withdrawn.");
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "Bond withdrawal failed.");
     } finally {
       setAction(null);
     }
@@ -224,9 +259,8 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
         args: [BigInt(nft.tokenId), buyer, buyerResult.signature as `0x${string}`, offer, offerResult.signature as `0x${string}`],
         value: offer,
       });
-      await waitAndRefresh(hash);
+      await waitAndRefresh(hash, true);
       toast.success("Sale finalized on-chain.");
-      setSelected(null);
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Settlement failed.");
@@ -237,39 +271,44 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
 
   if (nfts.length === 0) {
     return (
-      <div className="muted-panel px-6 py-16 text-center">
-        <h3 className="text-2xl font-black text-[rgb(var(--ink))]">No NFTs yet</h3>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-[rgb(var(--muted))]">Mint the first item to open the market.</p>
+      <div className="empty-state">
+        <h3>No matching NFTs</h3>
+        <p>Mint a token or adjust the marketplace filters.</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
         {nfts.map((nft) => (
           <article key={nft.tokenId} className="group hero-media transition-transform duration-200 hover:-translate-y-1">
             <button
               type="button"
               className="block w-full text-left"
               onClick={() => {
-                setSelected(nft);
+                setSelectedTokenId(nft.tokenId);
                 setRevealed(null);
                 setOfferAmount("");
               }}
             >
-              <div className="relative aspect-square overflow-hidden border-b border-[rgb(var(--line))] bg-[rgb(var(--surface))]">
-                <img src={nft.image} alt={nft.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+              <div className="relative aspect-square overflow-hidden border-b border-[var(--color-rule)] bg-[var(--color-paper-soft)]">
+                <img src={nft.image} alt={nft.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                 <div className="absolute left-3 top-3">
-                  <span className="status-pill bg-[rgb(var(--surface)/0.92)]">{nft.listingActive ? "Listed" : "Owned"}</span>
+                  <span className="status-pill bg-[var(--color-surface)]" data-tone={listingTone(nft)}>
+                    {listingLabel(nft)}
+                  </span>
                 </div>
               </div>
-              <div className="p-4">
+              <div className="grid gap-4 p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="min-w-0 truncate text-lg font-black text-[rgb(var(--ink))]">{nft.name}</h3>
-                  <p className="text-sm font-extrabold text-[rgb(var(--teal))]">{nft.displayPrice}</p>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-xl">{nft.name}</h3>
+                    <p className="mt-1 line-clamp-2 text-sm leading-6 text-[var(--color-muted)]">{nft.description}</p>
+                  </div>
+                  <p className="shrink-0 text-sm font-black text-[var(--color-action)]">{nft.displayPrice}</p>
                 </div>
-                <div className="mt-4 flex items-center justify-between text-sm text-[rgb(var(--muted))]">
+                <div className="flex items-center justify-between gap-4 text-sm text-[var(--color-muted)]">
                   <span>#{nft.tokenId}</span>
                   <span>{nft.bidCount} offers</span>
                 </div>
@@ -280,40 +319,56 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
       </div>
 
       {selected ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(var(--ink)/0.36)] p-4 backdrop-blur-sm" onClick={() => setSelected(null)}>
-          <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-[rgb(var(--line))] bg-[rgb(var(--surface))]" onClick={(event) => event.stopPropagation()}>
-            <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_380px]">
-              <div className="relative min-h-[320px] bg-[rgb(var(--surface))]">
-                <img src={selected.image} alt={selected.name} className="h-full max-h-[720px] w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => setSelected(null)}
-                  className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--surface)/0.92)] font-extrabold text-[rgb(var(--ink))]"
-                  aria-label="Close"
-                >
-                  X
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-backdrop)] p-3 backdrop-blur-sm" onClick={() => setSelectedTokenId(null)}>
+          <div
+            className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-[var(--radius-md)] border border-[var(--color-rule)] bg-[var(--color-surface)] shadow-[var(--shadow-float)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_25rem]">
+              <div className="relative min-h-[20rem] bg-[var(--color-paper-soft)]">
+                <img src={selected.image} alt={selected.name} className="h-full max-h-[45rem] w-full object-cover" />
+                <button type="button" onClick={() => setSelectedTokenId(null)} className="btn-secondary absolute right-3 top-3 min-h-0 px-3 py-2">
+                  Close
                 </button>
               </div>
 
               <div className="flex flex-col gap-5 p-5">
                 <div>
-                  <p className="eyebrow">{selected.listingActive ? "Listed" : "Owned"}</p>
-                  <h2 className="mt-3 text-3xl font-black text-[rgb(var(--ink))]">{selected.name}</h2>
+                  <span className="status-pill" data-tone={listingTone(selected)}>
+                    {listingLabel(selected)}
+                  </span>
+                  <h2 className="mt-3 text-3xl">{selected.name}</h2>
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">{selected.description}</p>
                 </div>
 
-                <div className="divide-y divide-[rgb(var(--line))] border-y border-[rgb(var(--line))] text-sm">
-                  <p className="flex justify-between py-3"><span className="text-[rgb(var(--muted))]">Price</span><strong>{selected.displayPrice}</strong></p>
-                  <p className="flex justify-between py-3"><span className="text-[rgb(var(--muted))]">Offers</span><strong>{selected.bidCount}</strong></p>
-                  <p className="flex justify-between py-3"><span className="text-[rgb(var(--muted))]">Seller</span><strong>{shortAddress(selected.seller)}</strong></p>
-                  <p className="flex justify-between py-3">
-                    <span className="text-[rgb(var(--muted))]">Reveal</span>
-                    <strong>{selected.revealPrepared ? (selected.settlementExpired ? "Expired" : "Ready") : "Sealed"}</strong>
-                  </p>
+                <div className="table-list">
+                  <div className="table-row">
+                    <span>Price</span>
+                    <strong>{selected.displayPrice}</strong>
+                  </div>
+                  <div className="table-row">
+                    <span>Offers</span>
+                    <strong>{selected.bidCount}</strong>
+                  </div>
+                  <div className="table-row">
+                    <span>Seller</span>
+                    <strong>{shortAddress(selected.seller)}</strong>
+                  </div>
+                  <div className="table-row">
+                    <span>Reveal</span>
+                    <strong>{revealLabel(selected)}</strong>
+                  </div>
+                  {isConnected ? (
+                    <div className="table-row">
+                      <span>Your bond</span>
+                      <strong>{selected.myBidBond > 0n ? `${formatEther(selected.myBidBond)} ETH` : "none"}</strong>
+                    </div>
+                  ) : null}
                 </div>
 
                 {revealed ? (
-                  <div className="border-y border-[rgb(var(--line))] py-3">
-                    <p className="text-sm text-[rgb(var(--muted))]">
+                  <div className="muted-panel p-4">
+                    <p className="text-sm leading-6 text-[var(--color-muted)]">
                       Buyer {shortAddress(revealed.buyer)}
                       {revealed.offer > 0n ? ` at ${formatEther(revealed.offer)} ETH` : ""}
                     </p>
@@ -321,48 +376,72 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
                 ) : null}
 
                 {!isConnected ? (
-                  <div className="border-t border-[rgb(var(--line))] pt-5">
-                    <ConnectButton showBalance={false} />
+                  <div className="border-t border-[var(--color-rule)] pt-5">
+                    <WalletConnectButton />
                   </div>
                 ) : selectedIsSeller ? (
-                  <div className="grid gap-3 border-t border-[rgb(var(--line))] pt-5">
-                    <button disabled={!selected.bidReceived || selected.revealPrepared || busy || Boolean(action)} onClick={() => prepareReveal(selected)} className="btn-primary disabled:opacity-55">
+                  <div className="grid gap-3 border-t border-[var(--color-rule)] pt-5">
+                    <button
+                      disabled={!selected.listingActive || !selected.bidReceived || selected.revealPrepared || busy || Boolean(action)}
+                      onClick={() => prepareReveal(selected)}
+                      className="btn-primary"
+                    >
                       Prepare winning reveal
                     </button>
-                    <button disabled={!selected.revealPrepared || busy || Boolean(action)} onClick={() => closeNoSale(selected)} className="btn-secondary disabled:opacity-55">
+                    <button disabled={!selected.listingActive || !selected.revealPrepared || busy || Boolean(action)} onClick={() => closeNoSale(selected)} className="btn-secondary">
                       Close if no winner
                     </button>
-                    <button disabled={!selected.settlementExpired || busy || Boolean(action)} onClick={() => reclaimExpiredReveal(selected)} className="btn-danger disabled:opacity-55">
+                    <button disabled={!selected.listingActive || !selected.settlementExpired || busy || Boolean(action)} onClick={() => reclaimExpiredReveal(selected)} className="btn-danger">
                       Reclaim expired reveal
                     </button>
-                    <button disabled={selected.bidReceived || busy || Boolean(action)} onClick={() => cancelListing(selected)} className="btn-danger disabled:opacity-55">
+                    <button disabled={!selected.listingActive || selected.bidReceived || busy || Boolean(action)} onClick={() => cancelListing(selected)} className="btn-danger">
                       Cancel listing
                     </button>
                     {selected.revealPrepared && selected.settlementDeadline > 0n ? (
-                      <p className="text-xs font-semibold text-[rgb(var(--muted))]">
+                      <p className="text-xs font-semibold text-[var(--color-muted)]">
                         Settlement deadline: {new Date(Number(selected.settlementDeadline) * 1000).toLocaleString()}
                       </p>
                     ) : null}
                   </div>
                 ) : selected.listingActive ? (
-                  <div className="grid gap-3 border-t border-[rgb(var(--line))] pt-5">
-                    <label className="field-label">Sealed offer</label>
+                  <div className="grid gap-3 border-t border-[var(--color-rule)] pt-5">
+                    <label className="field-label" htmlFor="sealed-offer">
+                      Sealed offer
+                    </label>
                     <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                       <div className="relative">
-                        <input value={offerAmount} onChange={(event) => setOfferAmount(event.target.value)} placeholder="0.18" type="number" min="0" step="0.001" className="field pr-16" />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[rgb(var(--muted))]">ETH</span>
+                        <input
+                          id="sealed-offer"
+                          value={offerAmount}
+                          onChange={(event) => setOfferAmount(event.target.value)}
+                          placeholder="0.18"
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          className="field pr-16"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-extrabold text-[var(--color-muted)]">ETH</span>
                       </div>
-                      <button disabled={selected.revealPrepared || busy || Boolean(action)} onClick={() => submitOffer(selected)} className="btn-primary disabled:opacity-55">
+                      <button disabled={selected.revealPrepared || busy || Boolean(action)} onClick={() => submitOffer(selected)} className="btn-primary">
                         Place offer
                       </button>
                     </div>
-                    <button disabled={!selected.revealPrepared || busy || Boolean(action)} onClick={() => finalizeSale(selected)} className="btn-secondary disabled:opacity-55">
+                    <button disabled={!selected.revealPrepared || busy || Boolean(action)} onClick={() => finalizeSale(selected)} className="btn-secondary">
                       Finalize if winning
+                    </button>
+                    <p className="text-xs font-semibold text-[var(--color-muted)]">
+                      A {formatEther(BID_BOND_WEI)} ETH bid bond is sent only if your wallet has no active bond on this listing.
+                    </p>
+                  </div>
+                ) : selected.myBidBond > 0n ? (
+                  <div className="grid gap-3 border-t border-[var(--color-rule)] pt-5">
+                    <button disabled={selected.listingActive || busy || Boolean(action)} onClick={() => withdrawBidBond(selected)} className="btn-primary">
+                      Withdraw bid bond
                     </button>
                   </div>
                 ) : null}
 
-                <p className="min-h-6 text-sm font-semibold text-[rgb(var(--muted))]">{action || status?.label || ""}</p>
+                <p className="min-h-6 text-sm font-semibold text-[var(--color-muted)]">{action || status?.label || ""}</p>
               </div>
             </div>
           </div>
@@ -370,4 +449,36 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
       ) : null}
     </>
   );
+}
+
+function listingLabel(nft: MarketplaceNFT) {
+  if (nft.listingActive) {
+    if (nft.settlementExpired) return "Expired";
+    if (nft.revealPrepared) return "Reveal ready";
+    return "Listed";
+  }
+  if (nft.revealedPrice > 0n) return "Settled";
+  if (nft.revealPrepared && nft.bidReceived) return "Closed";
+  return "Owned";
+}
+
+function listingTone(nft: MarketplaceNFT) {
+  if (nft.listingActive) {
+    if (nft.settlementExpired) return "danger";
+    if (nft.revealPrepared) return "warning";
+    return "action";
+  }
+  if (nft.revealedPrice > 0n) return "success";
+  return undefined;
+}
+
+function revealLabel(nft: MarketplaceNFT) {
+  if (nft.listingActive) {
+    if (nft.settlementExpired) return "Expired";
+    return nft.revealPrepared ? "Ready" : "Sealed";
+  }
+
+  if (nft.revealedPrice > 0n) return "Settled";
+  if (nft.revealPrepared && nft.bidReceived) return "Closed";
+  return "Inactive";
 }

@@ -14,6 +14,7 @@ import {
   getPublicClient,
   hasContractConfig,
 } from "@/lib/contracts";
+import { emptyMarketplaceIndex, type MarketplaceIndexResponse } from "@/lib/marketplace-index";
 import { parseTokenUri, resolveAssetUrl, type TokenMetadata } from "@/lib/metadata";
 
 const ZERO_HANDLE = `0x${"0".repeat(64)}` as Hex;
@@ -40,6 +41,7 @@ export interface MarketplaceNFT {
   pendingBuyerHandle: Hex;
   revealedPrice: bigint;
   revealedBuyer: Address;
+  myBidBond: bigint;
   displayPrice: string;
 }
 
@@ -61,6 +63,7 @@ export function useStealthMarketplace() {
   const fallbackPublicClient = useMemo(() => getPublicClient(APP_CHAIN_ID), []);
   const publicClient = (wagmiPublicClient || fallbackPublicClient) as PublicClient;
   const [nfts, setNfts] = useState<MarketplaceNFT[]>([]);
+  const [indexer, setIndexer] = useState<MarketplaceIndexResponse>(emptyMarketplaceIndex);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +71,7 @@ export function useStealthMarketplace() {
     if (!hasContractConfig) {
       setError("Contract addresses are not configured. Add the deployed NFT and marketplace addresses to .env.local.");
       setNfts([]);
+      setIndexer({ ...emptyMarketplaceIndex, checkedAt: new Date().toISOString(), warning: "Missing contract configuration." });
       return;
     }
 
@@ -75,14 +79,10 @@ export function useStealthMarketplace() {
     setError(null);
 
     try {
-      const totalSupply = (await publicClient.readContract({
-        address: NFT_ADDRESS,
-        abi: NFT_ABI,
-        functionName: "totalSupply",
-      })) as bigint;
-
-      const tokenIds = Array.from({ length: Number(totalSupply) }, (_, index) => BigInt(index + 1));
-      const loaded = await Promise.all(tokenIds.map((tokenId) => loadToken(publicClient, tokenId)));
+      const index = await fetchMarketplaceIndex();
+      const tokenIds = index.tokenIds.length > 0 ? index.tokenIds.map(BigInt) : await readTokenIdsFromSupply(publicClient);
+      const loaded = await Promise.all(tokenIds.map((tokenId) => loadToken(publicClient, tokenId, address)));
+      setIndexer(index.tokenIds.length > 0 ? index : { ...index, tokenIds: tokenIds.map(Number), totalIndexedTokens: tokenIds.length });
 
       setNfts(
         loaded
@@ -95,7 +95,7 @@ export function useStealthMarketplace() {
     } finally {
       setIsLoading(false);
     }
-  }, [publicClient]);
+  }, [address, publicClient]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -109,6 +109,8 @@ export function useStealthMarketplace() {
     address,
     nfts,
     activeListings: nfts.filter((item) => item.listingActive),
+    activity: indexer.activity,
+    indexer,
     isLoading,
     error,
     refresh,
@@ -118,7 +120,40 @@ export function useStealthMarketplace() {
   };
 }
 
-async function loadToken(publicClient: PublicClient, tokenId: bigint): Promise<MarketplaceNFT | null> {
+async function fetchMarketplaceIndex(): Promise<MarketplaceIndexResponse> {
+  try {
+    const response = await fetch("/api/indexer/marketplace", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Indexer returned ${response.status}`);
+    }
+
+    return (await response.json()) as MarketplaceIndexResponse;
+  } catch (error) {
+    return {
+      ...emptyMarketplaceIndex,
+      checkedAt: new Date().toISOString(),
+      source: "supply-fallback",
+      warning: error instanceof Error ? error.message : "Indexer request failed.",
+    };
+  }
+}
+
+async function readTokenIdsFromSupply(publicClient: PublicClient) {
+  const totalSupply = (await publicClient.readContract({
+    address: NFT_ADDRESS,
+    abi: NFT_ABI,
+    functionName: "totalSupply",
+  })) as bigint;
+
+  const total = Number(totalSupply);
+  if (!Number.isSafeInteger(total) || total <= 0) {
+    return [];
+  }
+
+  return Array.from({ length: total }, (_, index) => BigInt(total - index));
+}
+
+async function loadToken(publicClient: PublicClient, tokenId: bigint, viewer?: Address): Promise<MarketplaceNFT | null> {
   try {
     const [tokenUri, owner, creator] = await Promise.all([
       publicClient.readContract({ address: NFT_ADDRESS, abi: NFT_ABI, functionName: "tokenURI", args: [tokenId] }) as Promise<string>,
@@ -131,6 +166,7 @@ async function loadToken(publicClient: PublicClient, tokenId: bigint): Promise<M
     const metadata = await parseTokenUri(tokenUri);
     const core = await readListingCore(publicClient, tokenId);
     const handles = await readSettlementHandles(publicClient, tokenId, core);
+    const myBidBond = viewer ? await readBidBond(publicClient, tokenId, viewer) : 0n;
     const revealedPrice = core.revealedPrice;
     const settlementDeadline =
       core.revealPreparedAt > 0n ? core.revealPreparedAt + BigInt(SETTLEMENT_GRACE_PERIOD_SECONDS) : 0n;
@@ -150,19 +186,31 @@ async function loadToken(publicClient: PublicClient, tokenId: bigint): Promise<M
       revealPrepared: core.revealPrepared,
       revealPreparedAt: core.revealPreparedAt,
       settlementDeadline,
-      settlementExpired: core.revealPrepared && settlementDeadline > 0n && BigInt(Math.floor(Date.now() / 1000)) > settlementDeadline,
+      settlementExpired: core.active && core.revealPrepared && settlementDeadline > 0n && BigInt(Math.floor(Date.now() / 1000)) > settlementDeadline,
       bidCount: core.bidCount,
       reserveHandle: core.reserveHandle,
       highestOfferHandle: handles.highestOfferHandle,
       pendingBuyerHandle: handles.pendingBuyerHandle,
       revealedPrice,
       revealedBuyer: core.revealedBuyer,
+      myBidBond,
       displayPrice: revealedPrice > 0n ? `${formatEther(revealedPrice)} ETH` : "Sealed",
     };
   } catch (error) {
     console.warn(`Skipping token ${tokenId.toString()}`, error);
     return null;
   }
+}
+
+async function readBidBond(publicClient: PublicClient, tokenId: bigint, bidder: Address) {
+  return (await publicClient
+    .readContract({
+      address: MARKETPLACE_ADDRESS,
+      abi: MARKETPLACE_ABI,
+      functionName: "getBidBond",
+      args: [tokenId, bidder],
+    })
+    .catch(() => 0n)) as bigint;
 }
 
 async function readListingCore(publicClient: PublicClient, tokenId: bigint): Promise<ListingCore> {

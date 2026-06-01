@@ -5,21 +5,22 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
-    "start": "next start",
-    "lint": "eslint ."
+    "start": "node scripts/start.mjs",
+    "lint": "eslint .",
+    "validate:env": "node scripts/validate-env.mjs",
+    "release:check": "node scripts/validate-env.mjs --strict && npm run lint && npm run build"
   },
   "dependencies": {
-    "@cofhe/abi": "^0.4.0",
-    "@cofhe/sdk": "^0.4.0",
-    "@rainbow-me/rainbowkit": "^2.2.11",
+    "@cofhe/abi": "^0.5.2",
+    "@cofhe/sdk": "^0.5.2",
     "@tanstack/query-core": "^5.100.9",
     "@tanstack/react-query": "^5.95.2",
-    "next": "^16.2.6",
+    "next": "16.2.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sonner": "^2.0.7",
-    "viem": "^2.21.54",
-    "wagmi": "^2.13.5"
+    "viem": "^2.51.3",
+    "wagmi": "^3.6.16"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -30,9 +31,16 @@
     "eslint": "^9",
     "eslint-config-next": "^16.2.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
+  },
+  "optionalDependencies": {
+    "@next/swc-win32-x64-msvc": "16.2.6"
   },
   "overrides": {
+    "viem": "$viem",
+    "@cofhe/sdk": {
+      "viem": "$viem"
+    },
     "axios": "1.16.0",
     "postcss": "8.5.10"
   }

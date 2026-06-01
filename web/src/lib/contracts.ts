@@ -1,12 +1,25 @@
-import { createPublicClient, http, isAddress, zeroAddress } from "viem";
-import { arbitrumSepolia, baseSepolia, sepolia } from "viem/chains";
+import { createPublicClient, defineChain, http, isAddress, zeroAddress } from "viem";
 
 export const APP_CHAIN_ID = 11155111;
 export const MAX_ENCRYPTED_WEI = 18_446_744_073_709_551_615n;
 export const SETTLEMENT_GRACE_PERIOD_SECONDS = 172_800;
+export const BID_BOND_WEI = 1_000_000_000_000_000n;
 
 export const NFT_ADDRESS = (process.env.NEXT_PUBLIC_NFT_ADDRESS || "") as `0x${string}`;
 export const MARKETPLACE_ADDRESS = (process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS || "") as `0x${string}`;
+
+export const SEPOLIA_CHAIN = defineChain({
+  id: APP_CHAIN_ID,
+  name: "Sepolia",
+  nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: [process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://rpc.sepolia.ethpandaops.io"] },
+  },
+  blockExplorers: {
+    default: { name: "Etherscan", url: "https://sepolia.etherscan.io" },
+  },
+  testnet: true,
+});
 
 export const hasContractConfig =
   isAddress(NFT_ADDRESS) &&
@@ -22,6 +35,7 @@ export const ENCRYPTED_UINT64_COMPONENTS = [
 ] as const;
 
 export const MARKETPLACE_ABI = [
+  { inputs: [], name: "MIN_BID_BOND", outputs: [{ internalType: "uint256", name: "", type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "SETTLEMENT_GRACE_PERIOD", outputs: [{ internalType: "uint64", name: "", type: "uint64" }], stateMutability: "view", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "allowPublicBuyer", outputs: [], stateMutability: "nonpayable", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "allowPublicPrice", outputs: [], stateMutability: "nonpayable", type: "function" },
@@ -32,7 +46,7 @@ export const MARKETPLACE_ABI = [
     ],
     name: "buyNFT",
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "payable",
     type: "function",
   },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "cancelListing", outputs: [], stateMutability: "nonpayable", type: "function" },
@@ -58,6 +72,16 @@ export const MARKETPLACE_ABI = [
     name: "finalizeSale",
     outputs: [],
     stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+      { internalType: "address", name: "bidder", type: "address" },
+    ],
+    name: "getBidBond",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -91,6 +115,16 @@ export const MARKETPLACE_ABI = [
   {
     inputs: [
       { internalType: "uint256", name: "tokenId", type: "uint256" },
+      { internalType: "address", name: "bidder", type: "address" },
+    ],
+    name: "bidBonds",
+    outputs: [{ internalType: "uint256", name: "amount", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
       { components: ENCRYPTED_UINT64_COMPONENTS, internalType: "struct InEuint64", name: "encPrice", type: "tuple" },
     ],
     name: "listNFT",
@@ -118,7 +152,17 @@ export const MARKETPLACE_ABI = [
   { inputs: [], name: "nft", outputs: [{ internalType: "contract IERC721", name: "", type: "address" }], stateMutability: "view", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "pendingBuyer", outputs: [{ internalType: "eaddress", name: "", type: "bytes32" }], stateMutability: "view", type: "function" },
   { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "prepareSaleReveal", outputs: [], stateMutability: "nonpayable", type: "function" },
-  { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "reclaimExpiredReveal", outputs: [], stateMutability: "nonpayable", type: "function" },
+  {
+    inputs: [
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+      { internalType: "address", name: "buyerPlain", type: "address" },
+      { internalType: "bytes", name: "buyerSig", type: "bytes" },
+    ],
+    name: "reclaimExpiredReveal",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
   {
     inputs: [
       { internalType: "uint256", name: "tokenId", type: "uint256" },
@@ -126,11 +170,15 @@ export const MARKETPLACE_ABI = [
     ],
     name: "submitSealedOffer",
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "payable",
     type: "function",
   },
+  { inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }], name: "withdrawBidBond", outputs: [], stateMutability: "nonpayable", type: "function" },
   { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }, { indexed: false, internalType: "bytes32", name: "reserveHandle", type: "bytes32" }], name: "Listed", type: "event" },
-  { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }], name: "ExpiredRevealReclaimed", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: false, internalType: "bytes32", name: "buyerHandle", type: "bytes32" }, { indexed: false, internalType: "bytes32", name: "offerHandle", type: "bytes32" }], name: "SalePrepared", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }], name: "ListingCancelled", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }, { indexed: true, internalType: "address", name: "buyer", type: "address" }, { indexed: false, internalType: "uint256", name: "forfeitedBond", type: "uint256" }], name: "ExpiredRevealReclaimed", type: "event" },
+  { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "bidder", type: "address" }, { indexed: false, internalType: "uint256", name: "amount", type: "uint256" }], name: "BidBondWithdrawn", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "seller", type: "address" }], name: "NoSaleClosed", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "buyer", type: "address" }, { indexed: false, internalType: "uint32", name: "bidCount", type: "uint32" }], name: "SealedOfferSubmitted", type: "event" },
   { anonymous: false, inputs: [{ indexed: true, internalType: "uint256", name: "tokenId", type: "uint256" }, { indexed: true, internalType: "address", name: "buyer", type: "address" }, { indexed: true, internalType: "address", name: "seller", type: "address" }, { indexed: false, internalType: "uint64", name: "price", type: "uint64" }, { indexed: false, internalType: "address", name: "royaltyReceiver", type: "address" }, { indexed: false, internalType: "uint256", name: "royaltyAmount", type: "uint256" }], name: "SaleFinalized", type: "event" },
@@ -227,15 +275,13 @@ export const NFT_ABI = [
 ] as const;
 
 export const TESTNET_CONFIGS = {
-  sepolia: { chain: sepolia, rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://rpc.sepolia.ethpandaops.io" },
-  arbitrumSepolia: { chain: arbitrumSepolia, rpcUrl: process.env.NEXT_PUBLIC_ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc" },
-  baseSepolia: { chain: baseSepolia, rpcUrl: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org" },
+  sepolia: { chain: SEPOLIA_CHAIN, rpcUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://rpc.sepolia.ethpandaops.io" },
 } as const;
 
 export function getPublicClient(chainId: number) {
   const config = Object.values(TESTNET_CONFIGS).find((candidate) => candidate.chain.id === chainId);
   if (!config) {
-    return createPublicClient({ chain: sepolia, transport: http(TESTNET_CONFIGS.sepolia.rpcUrl) });
+    return createPublicClient({ chain: SEPOLIA_CHAIN, transport: http(TESTNET_CONFIGS.sepolia.rpcUrl) });
   }
 
   return createPublicClient({ chain: config.chain, transport: http(config.rpcUrl) });

@@ -31,7 +31,7 @@ async function getCofheClient() {
     cofheClientPromise = Promise.all([import("@cofhe/sdk/web"), import("@cofhe/sdk/chains")]).then(
       ([webSdk, chainSdk]) => {
         const config = webSdk.createCofheConfig({
-          supportedChains: [chainSdk.chains.sepolia, chainSdk.chains.arbSepolia, chainSdk.chains.baseSepolia],
+          supportedChains: [chainSdk.chains.sepolia],
           useWorkers: true,
         });
 
@@ -88,7 +88,7 @@ export function useCoFHE() {
 
     if (!connectedToCurrentWallet) {
       setStatus({ label: "Connecting CoFHE client", detail: "Preparing browser encryption context." });
-      await client.connect(publicClient, walletClient);
+      await client.connect(publicClient as never, walletClient as never);
     }
 
     return client;

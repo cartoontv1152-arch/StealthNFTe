@@ -1,5 +1,7 @@
 import type { Hex } from "viem";
 
+const MAX_ONCHAIN_TOKEN_URI_CHARS = 24_000;
+
 export type NftAttribute = {
   trait_type: string;
   value: string;
@@ -15,6 +17,7 @@ export type TokenMetadata = {
     stealth?: {
       version: string;
       privacyCommitment: Hex;
+      privateMetadataCommitted: boolean;
       privateMetadataEncrypted: boolean;
       encryptedReserve: boolean;
     };
@@ -27,6 +30,11 @@ export type MetadataInput = {
   image: string;
   attributes: NftAttribute[];
   privateNotes: string;
+};
+
+export type UploadedMedia = {
+  uri: string;
+  storage: "ipfs";
 };
 
 export async function buildTokenMetadata(input: MetadataInput) {
@@ -46,9 +54,10 @@ export async function buildTokenMetadata(input: MetadataInput) {
     attributes: input.attributes.filter((attribute) => attribute.trait_type && attribute.value),
     properties: {
       stealth: {
-        version: "wave-4",
+        version: "wave-5",
         privacyCommitment,
-        privateMetadataEncrypted: Boolean(input.privateNotes.trim()),
+        privateMetadataCommitted: Boolean(input.privateNotes.trim()),
+        privateMetadataEncrypted: false,
         encryptedReserve: true,
       },
     },
@@ -62,6 +71,8 @@ export async function buildTokenMetadata(input: MetadataInput) {
 }
 
 export async function uploadMetadata(metadata: TokenMetadata) {
+  const fallbackUri = encodeDataUri(metadata);
+
   try {
     const response = await fetch("/api/metadata", {
       method: "POST",
@@ -70,18 +81,41 @@ export async function uploadMetadata(metadata: TokenMetadata) {
     });
 
     if (!response.ok) {
-      throw new Error(`metadata upload failed: ${response.status}`);
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(data?.error || `metadata upload failed: ${response.status}`);
     }
 
     const data = (await response.json()) as { uri?: string };
     if (data.uri) {
       return data.uri;
     }
-  } catch {
-    // The API route returns a data URI unless server-side IPFS credentials are configured.
+  } catch (error) {
+    if (fallbackUri.length > MAX_ONCHAIN_TOKEN_URI_CHARS) {
+      throw error instanceof Error ? error : new Error("Metadata upload failed and the on-chain fallback is too large.");
+    }
   }
 
-  return encodeDataUri(metadata);
+  return fallbackUri;
+}
+
+export async function uploadMediaFile(file: File): Promise<UploadedMedia> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = (await response.json()) as { uri?: string; storage?: "ipfs"; error?: string };
+  if (!response.ok || !data.uri) {
+    throw new Error(data.error || `media upload failed: ${response.status}`);
+  }
+
+  return {
+    uri: data.uri,
+    storage: data.storage || "ipfs",
+  };
 }
 
 export async function parseTokenUri(uri: string): Promise<TokenMetadata | null> {
@@ -114,6 +148,10 @@ export function resolveAssetUrl(uri: string) {
 
 export function encodeDataUri(metadata: TokenMetadata) {
   return `data:application/json,${encodeURIComponent(JSON.stringify(metadata))}`;
+}
+
+export function isSafeOnchainTokenUri(uri: string) {
+  return uri.length <= MAX_ONCHAIN_TOKEN_URI_CHARS;
 }
 
 async function sha256Hex(input: string): Promise<Hex> {

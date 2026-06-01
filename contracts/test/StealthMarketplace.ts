@@ -26,6 +26,7 @@ describe("StealthMarketplace", function () {
 
     const tokenId = 1n;
     const reservePrice = parseEther("0.10");
+    const bidBond = await marketplace.MIN_BID_BOND();
 
     await nft
       .connect(seller)
@@ -37,17 +38,17 @@ describe("StealthMarketplace", function () {
 
     await marketplace.connect(seller).listNFT(tokenId, encryptedReserve);
 
-    return { seller, buyer, secondBuyer, nft, marketplace, tokenId, reservePrice };
+    return { seller, buyer, secondBuyer, nft, marketplace, tokenId, reservePrice, bidBond };
   }
 
   it("settles the winning sealed offer with CoFHE decrypt proofs and ERC-2981 royalties", async function () {
-    const { seller, buyer, nft, marketplace, tokenId } = await deployListedToken();
+    const { seller, buyer, nft, marketplace, tokenId, bidBond } = await deployListedToken();
     const winningOffer = parseEther("0.14");
 
     const buyerClient = await hre.cofhe.createClientWithBatteries(buyer);
     const [encryptedOffer] = await buyerClient.encryptInputs([Encryptable.uint64(winningOffer)]).execute();
 
-    await expect(marketplace.connect(buyer).submitSealedOffer(tokenId, encryptedOffer))
+    await expect(marketplace.connect(buyer).submitSealedOffer(tokenId, encryptedOffer, { value: bidBond }))
       .to.emit(marketplace, "SealedOfferSubmitted")
       .withArgs(tokenId, buyer.address, 1);
 
@@ -72,6 +73,7 @@ describe("StealthMarketplace", function () {
       .withArgs(tokenId, buyer.address, seller.address, winningOffer, seller.address, 0);
 
     expect(await nft.ownerOf(tokenId)).to.equal(buyer.address);
+    expect(await marketplace.getBidBond(tokenId, buyer.address)).to.equal(0n);
 
     const finalState = await marketplace.getListingCore(tokenId);
     expect(finalState[2]).to.equal(false);
@@ -80,33 +82,35 @@ describe("StealthMarketplace", function () {
   });
 
   it("rejects new sealed offers once seller prepares the reveal", async function () {
-    const { seller, buyer, secondBuyer, marketplace, tokenId } = await deployListedToken();
+    const { seller, buyer, secondBuyer, marketplace, tokenId, bidBond } = await deployListedToken();
     const buyerClient = await hre.cofhe.createClientWithBatteries(buyer);
     const [encryptedOffer] = await buyerClient.encryptInputs([Encryptable.uint64(parseEther("0.14"))]).execute();
-    await marketplace.connect(buyer).submitSealedOffer(tokenId, encryptedOffer);
+    await marketplace.connect(buyer).submitSealedOffer(tokenId, encryptedOffer, { value: bidBond });
     await marketplace.connect(seller).prepareSaleReveal(tokenId);
 
     const secondBuyerClient = await hre.cofhe.createClientWithBatteries(secondBuyer);
     const [lateOffer] = await secondBuyerClient.encryptInputs([Encryptable.uint64(parseEther("0.20"))]).execute();
 
-    await expect(marketplace.connect(secondBuyer).submitSealedOffer(tokenId, lateOffer)).to.be.revertedWith(
+    await expect(marketplace.connect(secondBuyer).submitSealedOffer(tokenId, lateOffer, { value: bidBond })).to.be.revertedWith(
       "Stealth: reveal prepared"
     );
   });
 
-  it("lets the seller close a reveal when no offer meets the reserve", async function () {
-    const { seller, buyer, nft, marketplace, tokenId } = await deployListedToken();
+  it("lets the seller close a reveal when no offer meets the reserve without revealing reserve", async function () {
+    const { seller, buyer, nft, marketplace, tokenId, bidBond } = await deployListedToken();
     const buyerClient = await hre.cofhe.createClientWithBatteries(buyer);
     const [belowReserveOffer] = await buyerClient.encryptInputs([Encryptable.uint64(parseEther("0.01"))]).execute();
 
-    await marketplace.connect(buyer).submitSealedOffer(tokenId, belowReserveOffer);
+    await marketplace.connect(buyer).submitSealedOffer(tokenId, belowReserveOffer, { value: bidBond });
     await marketplace.connect(seller).prepareSaleReveal(tokenId);
 
     const handles = await marketplace.getSettlementHandles(tokenId);
     const sellerClient = await hre.cofhe.createClientWithBatteries(seller);
+    const offerResult = await sellerClient.decryptForTx(handles[0]).withoutPermit().execute();
     const buyerResult = await sellerClient.decryptForTx(handles[1]).withoutPermit().execute();
     const buyerPlain = normalizeDecryptedAddress(buyerResult.decryptedValue);
 
+    expect(offerResult.decryptedValue).to.equal(0n);
     expect(buyerPlain).to.equal("0x0000000000000000000000000000000000000000");
     await expect(marketplace.connect(seller).closeNoSale(tokenId, buyerPlain, buyerResult.signature))
       .to.emit(marketplace, "NoSaleClosed")
@@ -115,24 +119,61 @@ describe("StealthMarketplace", function () {
     expect(await nft.ownerOf(tokenId)).to.equal(seller.address);
     const finalState = await marketplace.getListingCore(tokenId);
     expect(finalState[2]).to.equal(false);
+
+    await expect(marketplace.connect(buyer).withdrawBidBond(tokenId))
+      .to.emit(marketplace, "BidBondWithdrawn")
+      .withArgs(tokenId, buyer.address, bidBond);
   });
 
   it("lets the seller reclaim an expired reveal if the winner does not settle", async function () {
-    const { seller, buyer, nft, marketplace, tokenId } = await deployListedToken();
+    const { seller, buyer, nft, marketplace, tokenId, bidBond } = await deployListedToken();
     const buyerClient = await hre.cofhe.createClientWithBatteries(buyer);
     const [encryptedOffer] = await buyerClient.encryptInputs([Encryptable.uint64(parseEther("0.14"))]).execute();
 
-    await marketplace.connect(buyer).submitSealedOffer(tokenId, encryptedOffer);
+    await marketplace.connect(buyer).submitSealedOffer(tokenId, encryptedOffer, { value: bidBond });
     await marketplace.connect(seller).prepareSaleReveal(tokenId);
+
+    const handles = await marketplace.getSettlementHandles(tokenId);
+    const buyerResult = await buyerClient.decryptForTx(handles[1]).withoutPermit().execute();
+    const buyerPlain = normalizeDecryptedAddress(buyerResult.decryptedValue);
 
     const gracePeriod = await marketplace.SETTLEMENT_GRACE_PERIOD();
     await ethers.provider.send("evm_increaseTime", [Number(gracePeriod) + 1]);
     await ethers.provider.send("evm_mine", []);
 
-    await expect(marketplace.connect(seller).reclaimExpiredReveal(tokenId))
+    await expect(marketplace.connect(seller).reclaimExpiredReveal(tokenId, buyerPlain, buyerResult.signature))
       .to.emit(marketplace, "ExpiredRevealReclaimed")
-      .withArgs(tokenId, seller.address);
+      .withArgs(tokenId, seller.address, buyer.address, bidBond);
 
     expect(await nft.ownerOf(tokenId)).to.equal(seller.address);
+    expect(await marketplace.getBidBond(tokenId, buyer.address)).to.equal(0n);
+  });
+
+  it("lets losing bidders withdraw their bid bonds after settlement", async function () {
+    const { seller, buyer, secondBuyer, nft, marketplace, tokenId, bidBond } = await deployListedToken();
+    const buyerClient = await hre.cofhe.createClientWithBatteries(buyer);
+    const secondBuyerClient = await hre.cofhe.createClientWithBatteries(secondBuyer);
+    const [firstOffer] = await buyerClient.encryptInputs([Encryptable.uint64(parseEther("0.12"))]).execute();
+    const [winningOffer] = await secondBuyerClient.encryptInputs([Encryptable.uint64(parseEther("0.16"))]).execute();
+
+    await marketplace.connect(buyer).submitSealedOffer(tokenId, firstOffer, { value: bidBond });
+    await marketplace.connect(secondBuyer).submitSealedOffer(tokenId, winningOffer, { value: bidBond });
+    await marketplace.connect(seller).prepareSaleReveal(tokenId);
+
+    const handles = await marketplace.getSettlementHandles(tokenId);
+    const offerResult = await secondBuyerClient.decryptForTx(handles[0]).withoutPermit().execute();
+    const buyerResult = await secondBuyerClient.decryptForTx(handles[1]).withoutPermit().execute();
+    const buyerPlain = normalizeDecryptedAddress(buyerResult.decryptedValue);
+
+    await marketplace
+      .connect(secondBuyer)
+      .finalizeSale(tokenId, buyerPlain, buyerResult.signature, offerResult.decryptedValue, offerResult.signature, {
+        value: offerResult.decryptedValue,
+      });
+
+    expect(await nft.ownerOf(tokenId)).to.equal(secondBuyer.address);
+    await expect(marketplace.connect(buyer).withdrawBidBond(tokenId))
+      .to.emit(marketplace, "BidBondWithdrawn")
+      .withArgs(tokenId, buyer.address, bidBond);
   });
 });

@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  transpilePackages: ["@cofhe/sdk", "@rainbow-me/rainbowkit", "wagmi"],
+  transpilePackages: ["@cofhe/sdk", "wagmi"],
   webpack: (config) => {
     config.externals.push("pino-pretty", "lokijs", "encoding");
     config.resolve.alias = {

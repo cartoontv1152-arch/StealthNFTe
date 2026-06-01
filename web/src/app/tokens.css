@@ -1,0 +1,67 @@
+/* Hallmark · tokens · macrostructure: Workbench · tone: private-market utility · anchor hue: teal */
+:root {
+  --color-paper: oklch(96.8% 0.018 92);
+  --color-paper-soft: oklch(94.6% 0.017 86);
+  --color-surface: oklch(99.2% 0.004 100);
+  --color-surface-raised: oklch(100% 0 0);
+  --color-ink: oklch(20.6% 0.025 210);
+  --color-ink-strong: oklch(14.8% 0.026 212);
+  --color-muted: oklch(49.4% 0.023 205);
+  --color-muted-soft: oklch(64.8% 0.019 202);
+  --color-rule: oklch(87.8% 0.017 94);
+  --color-rule-strong: oklch(77.5% 0.03 192);
+  --color-action: oklch(44.5% 0.092 190);
+  --color-action-hover: oklch(38.8% 0.095 190);
+  --color-action-soft: oklch(89.8% 0.052 185);
+  --color-accent: oklch(63.5% 0.128 47);
+  --color-accent-soft: oklch(91.5% 0.06 64);
+  --color-danger: oklch(54.5% 0.16 28);
+  --color-danger-soft: oklch(93.6% 0.048 28);
+  --color-success: oklch(51% 0.102 150);
+  --color-success-soft: oklch(92.2% 0.055 151);
+  --color-warning: oklch(66% 0.12 72);
+  --color-warning-soft: oklch(93% 0.066 78);
+  --color-focus: oklch(58% 0.12 190);
+  --color-backdrop: oklch(18% 0.022 210 / 0.48);
+
+  --font-primary: var(--font-body), system-ui, sans-serif;
+  --font-title: var(--font-display), Georgia, serif;
+
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.35rem;
+  --text-display-s: 3rem;
+  --text-display: 4.55rem;
+
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-full: 999px;
+
+  --rule-thin: 1px;
+  --rule-heavy: 2px;
+
+  --ease-out: cubic-bezier(0.21, 1, 0.32, 1);
+  --ease-in: cubic-bezier(0.72, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-med: 180ms;
+  --dur-slow: 320ms;
+
+  --shadow-panel: 0 1px 0 oklch(100% 0 0 / 0.7), 0 18px 55px oklch(35% 0.03 200 / 0.09);
+  --shadow-float: 0 24px 80px oklch(24% 0.026 210 / 0.18);
+}
