@@ -66,6 +66,7 @@ async function main() {
   const [seller] = await hre.ethers.getSigners();
   const buyer = hre.ethers.Wallet.createRandom().connect(hre.ethers.provider);
   const fundAmount = parseEther(process.env.LIVE_SMOKE_BUYER_FUNDS || "0.05");
+  const scenario = process.env.LIVE_SMOKE_SCENARIO || "full";
 
   console.log("seller:", seller.address);
   console.log("buyer:", buyer.address);
@@ -78,42 +79,47 @@ async function main() {
   const buyerClient = await createClientFor(buyer);
   const bidBond = await marketplace.MIN_BID_BOND();
 
-  const noSaleTokenId = await mintAndList(nft, marketplace, seller, sellerClient, "No Sale", parseEther("0.002"));
-  const [belowReserveOffer] = await buyerClient.encryptInputs([Encryptable.uint64(parseEther("0.001"))]).execute();
-  await (await marketplace.connect(buyer).submitSealedOffer(noSaleTokenId, belowReserveOffer, { value: bidBond })).wait();
-  await (await marketplace.connect(seller).prepareSaleReveal(noSaleTokenId)).wait();
-  const noSaleHandles = await marketplace.getSettlementHandles(noSaleTokenId);
-  const noSaleBuyerResult = await sellerClient.decryptForTx(noSaleHandles[1]).withoutPermit().execute();
-  const noSaleBuyer = normalizeDecryptedAddress(noSaleBuyerResult.decryptedValue);
-  await (await marketplace.connect(seller).closeNoSale(noSaleTokenId, noSaleBuyer, noSaleBuyerResult.signature)).wait();
-  await (await marketplace.connect(buyer).withdrawBidBond(noSaleTokenId)).wait();
-  console.log(`closed no-sale token #${noSaleTokenId.toString()} and withdrew bidder bond`);
-
-  const saleTokenId = await mintAndList(nft, marketplace, seller, sellerClient, "Sale", parseEther("0.002"));
-  const winningOffer = parseEther("0.003");
-  const [encryptedWinningOffer] = await buyerClient.encryptInputs([Encryptable.uint64(winningOffer)]).execute();
-  await (await marketplace.connect(buyer).submitSealedOffer(saleTokenId, encryptedWinningOffer, { value: bidBond })).wait();
-  await (await marketplace.connect(seller).prepareSaleReveal(saleTokenId)).wait();
-  const saleHandles = await marketplace.getSettlementHandles(saleTokenId);
-  const [offerResult, buyerResult] = await Promise.all([
-    buyerClient.decryptForTx(saleHandles[0]).withoutPermit().execute(),
-    buyerClient.decryptForTx(saleHandles[1]).withoutPermit().execute(),
-  ]);
-  const buyerPlain = normalizeDecryptedAddress(buyerResult.decryptedValue);
-  await (
-    await marketplace
-      .connect(buyer)
-      .finalizeSale(saleTokenId, buyerPlain, buyerResult.signature, offerResult.decryptedValue, offerResult.signature, {
-        value: offerResult.decryptedValue,
-      })
-  ).wait();
-
-  const owner = await nft.ownerOf(saleTokenId);
-  if (owner.toLowerCase() !== buyer.address.toLowerCase()) {
-    throw new Error(`Unexpected owner after sale: ${owner}`);
+  if (scenario !== "sale") {
+    const noSaleTokenId = await mintAndList(nft, marketplace, seller, sellerClient, "No Sale", parseEther("0.002"));
+    const [belowReserveOffer] = await buyerClient.encryptInputs([Encryptable.uint64(parseEther("0.001"))]).execute();
+    await (await marketplace.connect(buyer).submitSealedOffer(noSaleTokenId, belowReserveOffer, { value: bidBond })).wait();
+    await (await marketplace.connect(seller).prepareSaleReveal(noSaleTokenId)).wait();
+    const noSaleHandles = await marketplace.getSettlementHandles(noSaleTokenId);
+    const noSaleBuyerResult = await sellerClient.decryptForTx(noSaleHandles[1]).withoutPermit().execute();
+    const noSaleBuyer = normalizeDecryptedAddress(noSaleBuyerResult.decryptedValue);
+    await (await marketplace.connect(seller).closeNoSale(noSaleTokenId, noSaleBuyer, noSaleBuyerResult.signature)).wait();
+    await (await marketplace.connect(buyer).withdrawBidBond(noSaleTokenId)).wait();
+    console.log(`closed no-sale token #${noSaleTokenId.toString()} and withdrew bidder bond`);
   }
 
-  console.log(`finalized sale token #${saleTokenId.toString()} to ${buyer.address}`);
+  if (scenario !== "nosale") {
+    const saleTokenId = await mintAndList(nft, marketplace, seller, sellerClient, "Sale", parseEther("0.002"));
+    const winningOffer = parseEther("0.003");
+    const [encryptedWinningOffer] = await buyerClient.encryptInputs([Encryptable.uint64(winningOffer)]).execute();
+    await (await marketplace.connect(buyer).submitSealedOffer(saleTokenId, encryptedWinningOffer, { value: bidBond })).wait();
+    await (await marketplace.connect(seller).prepareSaleReveal(saleTokenId)).wait();
+    const saleHandles = await marketplace.getSettlementHandles(saleTokenId);
+    const [offerResult, buyerResult] = await Promise.all([
+      buyerClient.decryptForTx(saleHandles[0]).withoutPermit().execute(),
+      buyerClient.decryptForTx(saleHandles[1]).withoutPermit().execute(),
+    ]);
+    const buyerPlain = normalizeDecryptedAddress(buyerResult.decryptedValue);
+    await (
+      await marketplace
+        .connect(buyer)
+        .finalizeSale(saleTokenId, buyerPlain, buyerResult.signature, offerResult.decryptedValue, offerResult.signature, {
+          value: offerResult.decryptedValue,
+        })
+    ).wait();
+
+    const owner = await nft.ownerOf(saleTokenId);
+    if (owner.toLowerCase() !== buyer.address.toLowerCase()) {
+      throw new Error(`Unexpected owner after sale: ${owner}`);
+    }
+
+    console.log(`finalized sale token #${saleTokenId.toString()} to ${buyer.address}`);
+  }
+
   console.log("live smoke passed");
 }
 
