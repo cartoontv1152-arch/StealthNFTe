@@ -22,23 +22,40 @@ export default function Home() {
 
   return (
     <PageShell>
-      <section className="home-hero">
+      <section className="home-hero" aria-labelledby="home-title">
         <img src={heroImage} alt={featured?.name || "Private NFT marketplace artwork"} className="home-hero-image" />
         <div className="home-hero-scrim" />
-        <div className="home-hero-content animate-reveal">
-          <p className="eyebrow">Private NFT marketplace on Sepolia</p>
-          <h1>Sell NFTs without exposing the auction.</h1>
-          <p>
-            StealthNFT gives creators a clean mint-to-market flow: encrypted reserves, sealed collector offers, and final
-            settlement proofs written on-chain only when they are needed.
-          </p>
-          <div className="hero-actions">
-            <Link href="/marketplace" className="btn-primary">
-              Open marketplace
-            </Link>
-            <Link href="/create" className="btn-secondary">
-              Create listing
-            </Link>
+        <div className="home-hero-inner">
+          <div className="home-hero-content animate-reveal">
+            <p className="eyebrow">Private NFT marketplace on Sepolia</p>
+            <h1 id="home-title">Sell NFTs without exposing the auction.</h1>
+            <p>
+              StealthNFT gives creators a clean mint-to-market flow: encrypted reserves, sealed collector offers, and final
+              settlement proofs written on-chain only when they are needed.
+            </p>
+            <div className="hero-actions">
+              <Link href="/marketplace" className="btn-primary">
+                Open marketplace
+              </Link>
+              <Link href="/create" className="btn-secondary">
+                Create listing
+              </Link>
+            </div>
+          </div>
+
+          <div className="home-hero-live" aria-label="Live marketplace status">
+            <span>
+              <strong>{activeListings.length}</strong> listed
+            </span>
+            <span>
+              <strong>{nfts.length}</strong> indexed
+            </span>
+            <span>
+              <strong>{totalOffers}</strong> offers
+            </span>
+            <span>
+              <strong>{indexMode}</strong> index
+            </span>
           </div>
         </div>
       </section>

@@ -230,7 +230,7 @@ export function NFTMinter() {
               <span>
                 <strong className="block text-[var(--color-ink-strong)]">{uploadingMedia ? "Uploading artwork" : "Choose artwork"}</strong>
                 <span className="mt-2 block text-sm leading-6 text-[var(--color-muted)]">
-                  Pins through Pinata/IPFS. Without server credentials, paste an existing image URL below.
+                  Pins through Pinata/IPFS. You can also paste an existing image URL below.
                 </span>
               </span>
             </label>

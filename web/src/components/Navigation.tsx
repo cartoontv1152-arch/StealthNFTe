@@ -8,6 +8,7 @@ const navLinks = [
   { href: "/", label: "Home" },
   { href: "/marketplace", label: "Market" },
   { href: "/create", label: "Create" },
+  { href: "/about", label: "About" },
 ];
 
 export function Navigation() {

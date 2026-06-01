@@ -180,7 +180,7 @@ img {
 
   .mobile-nav {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-xs);
     padding-bottom: var(--space-sm);
   }
@@ -200,8 +200,9 @@ img {
   }
 
   .site-main {
+    --main-pad-top: clamp(1.4rem, 4vw, 3.5rem);
     min-height: calc(100vh - 8rem);
-    padding-block: clamp(1.4rem, 4vw, 3.5rem) var(--space-3xl);
+    padding-block: var(--main-pad-top) var(--space-3xl);
   }
 
   .site-footer {
@@ -576,8 +577,11 @@ img {
   .home-hero {
     position: relative;
     display: grid;
-    min-height: clamp(31rem, 64vh, 39rem);
-    align-items: center;
+    width: 100vw;
+    min-height: clamp(34rem, calc(100svh - 8rem), 44rem);
+    margin-inline: calc(50% - 50vw);
+    margin-top: calc(-1 * var(--main-pad-top));
+    align-items: stretch;
     overflow: hidden;
     background: var(--color-ink-strong);
     isolation: isolate;
@@ -599,15 +603,25 @@ img {
   .home-hero-scrim {
     z-index: -1;
     background:
-      linear-gradient(90deg, color-mix(in oklch, var(--color-ink-strong) 82%, transparent), transparent 72%),
-      linear-gradient(0deg, color-mix(in oklch, var(--color-ink-strong) 56%, transparent), transparent 58%);
+      linear-gradient(90deg, color-mix(in oklch, var(--color-ink-strong) 88%, transparent) 0%, color-mix(in oklch, var(--color-ink-strong) 52%, transparent) 38%, transparent 74%),
+      linear-gradient(0deg, color-mix(in oklch, var(--color-ink-strong) 66%, transparent), transparent 54%),
+      linear-gradient(180deg, color-mix(in oklch, var(--color-ink-strong) 28%, transparent), transparent 32%);
+  }
+
+  .home-hero-inner {
+    display: grid;
+    width: min(1280px, 100%);
+    min-height: inherit;
+    margin-inline: auto;
+    align-content: end;
+    gap: var(--space-xl);
+    padding: clamp(1.25rem, 4vw, 4rem);
   }
 
   .home-hero-content {
     display: grid;
-    width: min(42rem, 100%);
+    width: min(46rem, 100%);
     gap: var(--space-sm);
-    padding: clamp(1.25rem, 4vw, 3rem);
     color: var(--color-surface-raised);
   }
 
@@ -618,8 +632,9 @@ img {
   }
 
   .home-hero-content h1 {
-    font-size: clamp(2.8rem, 6vw, 4.8rem);
-    line-height: 0.94;
+    max-width: 12ch;
+    font-size: clamp(3.25rem, 8.6vw, 7rem);
+    line-height: 0.88;
   }
 
   .home-hero-content p {
@@ -638,6 +653,33 @@ img {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-sm);
+  }
+
+  .home-hero-live {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-md);
+    width: min(56rem, 100%);
+    border-top: var(--rule-thin) solid color-mix(in oklch, var(--color-surface-raised) 34%, transparent);
+    padding-top: var(--space-md);
+    color: color-mix(in oklch, var(--color-surface-raised) 78%, transparent);
+  }
+
+  .home-hero-live span {
+    display: grid;
+    min-width: 0;
+    gap: var(--space-2xs);
+    font-size: var(--text-xs);
+    font-weight: 850;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .home-hero-live strong {
+    color: var(--color-surface-raised);
+    font-size: var(--text-xl);
+    line-height: 1;
+    text-transform: none;
   }
 
   .home-metrics {
@@ -977,18 +1019,22 @@ img {
 @media (max-width: 900px) {
   @layer components {
     .home-hero {
-      min-height: 35rem;
+      min-height: max(35rem, calc(100svh - 8.5rem));
     }
 
     .home-hero-scrim {
       background:
-        linear-gradient(0deg, color-mix(in oklch, var(--color-ink-strong) 78%, transparent), transparent 74%),
-        linear-gradient(90deg, color-mix(in oklch, var(--color-ink-strong) 58%, transparent), transparent);
+        linear-gradient(0deg, color-mix(in oklch, var(--color-ink-strong) 82%, transparent), transparent 78%),
+        linear-gradient(90deg, color-mix(in oklch, var(--color-ink-strong) 70%, transparent), transparent 86%);
+    }
+
+    .home-hero-inner {
+      gap: var(--space-lg);
+      padding: var(--space-lg);
     }
 
     .home-hero-content {
       gap: var(--space-sm);
-      padding: var(--space-lg);
     }
 
     .home-hero-content h1 {
@@ -999,6 +1045,11 @@ img {
     .home-hero-content p {
       font-size: var(--text-md);
       line-height: 1.55;
+    }
+
+    .home-hero-live {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-sm);
     }
 
     .home-metrics,
