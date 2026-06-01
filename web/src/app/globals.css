@@ -564,14 +564,15 @@ img {
     background: var(--color-action);
   }
 
-  .table-list {
+  .summary-list {
     display: grid;
     border-block: var(--rule-thin) solid var(--color-rule);
   }
 
-  .table-row {
+  .summary-row {
     display: flex;
     min-width: 0;
+    align-items: baseline;
     justify-content: space-between;
     gap: var(--space-md);
     border-bottom: var(--rule-thin) solid var(--color-rule);
@@ -580,12 +581,16 @@ img {
     font-size: var(--text-sm);
   }
 
-  .table-row:last-child {
+  .summary-row:last-child {
     border-bottom: 0;
   }
 
-  .table-row strong {
+  .summary-row span,
+  .summary-row strong {
     min-width: 0;
+  }
+
+  .summary-row strong {
     color: var(--color-ink-strong);
     font-weight: 900;
     text-align: right;

@@ -341,25 +341,25 @@ export function NFTGrid({ nfts, onRefresh }: NFTGridProps) {
                   <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">{selected.description}</p>
                 </div>
 
-                <div className="table-list">
-                  <div className="table-row">
+                <div className="summary-list">
+                  <div className="summary-row">
                     <span>Price</span>
                     <strong>{selected.displayPrice}</strong>
                   </div>
-                  <div className="table-row">
+                  <div className="summary-row">
                     <span>Offers</span>
                     <strong>{selected.bidCount}</strong>
                   </div>
-                  <div className="table-row">
+                  <div className="summary-row">
                     <span>Seller</span>
                     <strong>{shortAddress(selected.seller)}</strong>
                   </div>
-                  <div className="table-row">
+                  <div className="summary-row">
                     <span>Reveal</span>
                     <strong>{revealLabel(selected)}</strong>
                   </div>
                   {isConnected ? (
-                    <div className="table-row">
+                    <div className="summary-row">
                       <span>Your bond</span>
                       <strong>{selected.myBidBond > 0n ? `${formatEther(selected.myBidBond)} ETH` : "none"}</strong>
                     </div>

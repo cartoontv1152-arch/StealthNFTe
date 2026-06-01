@@ -402,16 +402,16 @@ export function NFTMinter() {
           ))}
         </div>
 
-        <div className="mt-6 table-list">
-          <div className="table-row">
+        <div className="summary-list mt-6">
+          <div className="summary-row">
             <span>Status</span>
             <strong>{status?.label || stepLabels[step]}</strong>
           </div>
-          <div className="table-row">
+          <div className="summary-row">
             <span>Token</span>
             <strong>{lastTokenId !== null ? `#${lastTokenId.toString()}` : "pending"}</strong>
           </div>
-          <div className="table-row">
+          <div className="summary-row">
             <span>Reserve</span>
             <strong>{autoList ? (priceWei > 0n ? `${price} ETH` : "not set") : "mint only"}</strong>
           </div>
