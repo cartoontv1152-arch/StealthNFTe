@@ -10,6 +10,30 @@ StealthNFT is a Sepolia testnet product built for WaveHack. It lets creators upl
 
 Live app: [https://stealth-nft.vercel.app](https://stealth-nft.vercel.app)
 
+## WaveHack Build Journey
+
+StealthNFT was built across the five WaveHack build cycles as a privacy-by-design NFT marketplace. Each wave moved the project from concept to a live Sepolia product with encrypted auction logic, IPFS uploads, recovery paths, and a production deployment.
+
+| Wave | Focus | What We Completed |
+| --- | --- | --- |
+| Wave 1 | Ideation and architecture | Defined the core problem: normal NFT auctions leak reserve prices, bidder intent, and market strategy. Chose a privacy-first marketplace as the product direction, mapped creator/collector/seller journeys, studied the Fhenix/coFHE stack, and designed the first contract architecture around encrypted reserve prices and sealed offers. |
+| Wave 2 | Confidential smart-contract prototype | Implemented the first Solidity foundation with `StealthNFT` and `StealthMarketplace`. Added ERC-721 minting, marketplace escrow, encrypted reserve inputs, encrypted collector offers, and the first FHE comparison flow so the contract can compare bids without plaintext prices. |
+| Wave 3 | Full dApp workflow | Built the Next.js app around the contract flow: wallet connection, creator minting, listing, marketplace browsing, sealed offer submission, and buyer finalization. Added frontend hooks for CoFHE encryption/decryption, contract ABIs, viem/wagmi reads and writes, and a user-facing flow that hides the cryptography behind normal marketplace actions. |
+| Wave 4 | Marketplace hardening | Added production-grade marketplace states and recovery paths: fixed bid bonds, losing/no-sale bond withdrawal, seller no-sale close, expired reveal reclaim, safe cancellation before bids, ERC-2981 royalty payout, activity indexing, notification states, and broader Hardhat tests for successful sale, failed sale, reveal lock, reclaim, and bid-bond behavior. |
+| Wave 5 | Final production polish | Finished the Sepolia/Vercel release: fresh optimized contract deployment, live event indexer, upload-only Pinata/IPFS artwork flow, metadata pinning API, responsive full-bleed homepage, creator studio polish, About page, favicon/manifest/SEO metadata, README documentation, environment validation, release checks, live smoke tests, and hosted production deployment. |
+
+### Final Wave 5 Status
+
+- Live frontend is deployed on Vercel at [https://stealth-nft.vercel.app](https://stealth-nft.vercel.app).
+- Fresh Sepolia contracts are deployed and wired into the hosted app.
+- The marketplace indexer reads live on-chain events from the current deployment block.
+- Creator artwork uploads are pinned through Pinata/IPFS before minting.
+- Metadata is pinned through the hosted API route.
+- Encrypted reserves and sealed offers are created client-side with CoFHE.
+- The contract verifies no-sale and winning-sale settlement paths on-chain.
+- Live smoke testing passed for the no-sale path and the winning sale finalization path.
+- Local release checks pass for contracts and frontend.
+
 ## What The App Does
 
 StealthNFT solves a common NFT marketplace problem: public bids and public reserve prices reveal too much information. In a normal auction, everyone can inspect seller expectations and bidder behavior. In StealthNFT, the seller's reserve and collectors' offers are encrypted with coFHE, compared on-chain, and only the winning settlement data is revealed when the listing is ready to close.
