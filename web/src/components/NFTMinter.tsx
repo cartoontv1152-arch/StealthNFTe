@@ -19,7 +19,7 @@ import {
 import { buildTokenMetadata, resolveAssetUrl, uploadMediaFile, uploadMetadata, type NftAttribute } from "@/lib/metadata";
 
 type MintStep = "idle" | "metadata" | "mint" | "approve" | "encrypt" | "list" | "done";
-type MediaStorage = "idle" | "remote" | "ipfs";
+type MediaStorage = "idle" | "ipfs";
 
 const stepLabels: Record<MintStep, string> = {
   idle: "Ready",
@@ -104,7 +104,7 @@ export function NFTMinter() {
     }
 
     if (!name.trim() || !description.trim() || !imageUrl.trim() || (autoList && !price.trim())) {
-      toast.error(autoList ? "Fill in the mint fields and reserve." : "Fill in the mint fields.");
+      toast.error(autoList ? "Upload artwork, fill in the mint fields, and set a reserve." : "Upload artwork and fill in the mint fields.");
       return;
     }
 
@@ -213,7 +213,7 @@ export function NFTMinter() {
               <p className="eyebrow">Artwork</p>
               <h2 className="mt-2 text-3xl">Media and metadata</h2>
             </div>
-            <span className="status-pill" data-tone={mediaStorage === "ipfs" ? "success" : mediaStorage === "idle" ? undefined : "action"}>
+            <span className="status-pill" data-tone={mediaStorage === "ipfs" ? "success" : undefined}>
               {mediaStorage === "idle" ? "Not uploaded" : mediaStorage}
             </span>
           </div>
@@ -230,7 +230,7 @@ export function NFTMinter() {
               <span>
                 <strong className="block text-[var(--color-ink-strong)]">{uploadingMedia ? "Uploading artwork" : "Choose artwork"}</strong>
                 <span className="mt-2 block text-sm leading-6 text-[var(--color-muted)]">
-                  Pins through Pinata/IPFS. You can also paste an existing image URL below.
+                  Upload an image to pin it through Pinata/IPFS before minting.
                 </span>
               </span>
             </label>
@@ -244,22 +244,6 @@ export function NFTMinter() {
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="mt-5">
-            <label className="field-label" htmlFor="image-url">
-              Image URL
-            </label>
-            <input
-              id="image-url"
-              value={imageUrl}
-              onChange={(event) => {
-                setImageUrl(event.target.value);
-                setMediaStorage(event.target.value ? "remote" : "idle");
-              }}
-              placeholder="ipfs://... or https://..."
-              className="field"
-            />
           </div>
         </section>
 
